@@ -11,7 +11,7 @@ object JvmDatabaseFactory {
     }
 
     fun fileBacked(databaseFile: File): SocialMediaDatabase {
-        val isNewDatabase = !databaseFile.exists()
+        val isNewDatabase = !databaseFile.exists() || databaseFile.length() == 0L
         databaseFile.parentFile?.mkdirs()
         val driver = JdbcSqliteDriver(
             url = "jdbc:sqlite:${databaseFile.absolutePath}",
