@@ -1,0 +1,198 @@
+CREATE TABLE configured_sources (
+  platform_id TEXT NOT NULL,
+  source_kind TEXT NOT NULL,
+  value TEXT NOT NULL,
+  PRIMARY KEY (platform_id, source_kind, value)
+);
+
+CREATE TABLE seen_items (
+  item_key TEXT NOT NULL PRIMARY KEY,
+  seen_at_epoch_millis INTEGER NOT NULL
+);
+
+CREATE TABLE account_sessions (
+  platform_id TEXT NOT NULL PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  access_token TEXT,
+  refresh_token TEXT,
+  expires_at_epoch_millis INTEGER
+);
+
+CREATE TABLE feed_sources (
+  platform_id TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  display_name TEXT NOT NULL,
+  PRIMARY KEY (platform_id, source_id)
+);
+
+CREATE TABLE feed_items (
+  item_key TEXT NOT NULL PRIMARY KEY,
+  item_id TEXT NOT NULL,
+  platform_id TEXT NOT NULL,
+  source_platform_id TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  author_name TEXT,
+  title TEXT,
+  body TEXT,
+  permalink TEXT,
+  published_at_epoch_millis INTEGER NOT NULL,
+  cached_at_epoch_millis INTEGER NOT NULL,
+  FOREIGN KEY (source_platform_id, source_id) REFERENCES feed_sources(platform_id, source_id) ON DELETE CASCADE
+);
+
+CREATE TABLE sync_state (
+  source_platform_id TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  next_cursor_value TEXT,
+  last_refreshed_at_epoch_millis INTEGER,
+  PRIMARY KEY (source_platform_id, source_id),
+  FOREIGN KEY (source_platform_id, source_id) REFERENCES feed_sources(platform_id, source_id) ON DELETE CASCADE
+);
+
+selectConfiguredSources:
+SELECT platform_id, source_kind, value
+FROM configured_sources
+ORDER BY platform_id, value;
+
+upsertConfiguredSource:
+INSERT OR REPLACE INTO configured_sources(platform_id, source_kind, value)
+VALUES (?, ?, ?);
+
+removeConfiguredSource:
+DELETE FROM configured_sources
+WHERE platform_id = ? AND source_kind = ? AND value = ?;
+
+removeAllConfiguredSources:
+DELETE FROM configured_sources;
+
+markSeen:
+INSERT OR REPLACE INTO seen_items(item_key, seen_at_epoch_millis)
+VALUES (?, ?);
+
+selectSeenItem:
+SELECT item_key
+FROM seen_items
+WHERE item_key = ?;
+
+removeAllSeenItems:
+DELETE FROM seen_items;
+
+selectAccountSession:
+SELECT platform_id, account_id, access_token, refresh_token, expires_at_epoch_millis
+FROM account_sessions
+WHERE platform_id = ?;
+
+upsertAccountSession:
+INSERT OR REPLACE INTO account_sessions(
+  platform_id,
+  account_id,
+  access_token,
+  refresh_token,
+  expires_at_epoch_millis
+)
+VALUES (?, ?, ?, ?, ?);
+
+removeAccountSession:
+DELETE FROM account_sessions
+WHERE platform_id = ?;
+
+removeAllAccountSessions:
+DELETE FROM account_sessions;
+
+upsertFeedSource:
+INSERT OR REPLACE INTO feed_sources(platform_id, source_id, display_name)
+VALUES (?, ?, ?);
+
+removeFeedItemsForSource:
+DELETE FROM feed_items
+WHERE source_platform_id = ? AND source_id = ?;
+
+upsertFeedItem:
+INSERT OR REPLACE INTO feed_items(
+  item_key,
+  item_id,
+  platform_id,
+  source_platform_id,
+  source_id,
+  author_name,
+  title,
+  body,
+  permalink,
+  published_at_epoch_millis,
+  cached_at_epoch_millis
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectFeedItemsForSource:
+SELECT
+  fi.item_key,
+  fi.item_id,
+  fi.platform_id,
+  fs.platform_id AS source_platform_id,
+  fs.source_id,
+  fs.display_name,
+  fi.author_name,
+  fi.title,
+  fi.body,
+  fi.permalink,
+  fi.published_at_epoch_millis,
+  si.item_key AS seen_item_key
+FROM feed_items fi
+JOIN feed_sources fs
+  ON fi.source_platform_id = fs.platform_id AND fi.source_id = fs.source_id
+LEFT JOIN seen_items si
+  ON si.item_key = fi.item_key
+WHERE fi.source_platform_id = ? AND fi.source_id = ?
+ORDER BY fi.published_at_epoch_millis DESC;
+
+selectUnseenFeedItemsForSource:
+SELECT
+  fi.item_key,
+  fi.item_id,
+  fi.platform_id,
+  fs.platform_id AS source_platform_id,
+  fs.source_id,
+  fs.display_name,
+  fi.author_name,
+  fi.title,
+  fi.body,
+  fi.permalink,
+  fi.published_at_epoch_millis,
+  si.item_key AS seen_item_key
+FROM feed_items fi
+JOIN feed_sources fs
+  ON fi.source_platform_id = fs.platform_id AND fi.source_id = fs.source_id
+LEFT JOIN seen_items si
+  ON si.item_key = fi.item_key
+WHERE fi.source_platform_id = ? AND fi.source_id = ? AND si.item_key IS NULL
+ORDER BY fi.published_at_epoch_millis DESC;
+
+upsertSyncState:
+INSERT OR REPLACE INTO sync_state(
+  source_platform_id,
+  source_id,
+  next_cursor_value,
+  last_refreshed_at_epoch_millis
+)
+VALUES (?, ?, ?, ?);
+
+selectSyncState:
+SELECT
+  ss.source_platform_id,
+  ss.source_id,
+  fs.display_name,
+  ss.next_cursor_value,
+  ss.last_refreshed_at_epoch_millis
+FROM sync_state ss
+JOIN feed_sources fs
+  ON ss.source_platform_id = fs.platform_id AND ss.source_id = fs.source_id
+WHERE ss.source_platform_id = ? AND ss.source_id = ?;
+
+removeAllFeedItems:
+DELETE FROM feed_items;
+
+removeAllFeedSources:
+DELETE FROM feed_sources;
+
+removeAllSyncState:
+DELETE FROM sync_state;
