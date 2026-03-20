@@ -29,6 +29,7 @@ interface ConfiguredSourceRepository {
 
 interface SessionRepository {
     suspend fun getSessionState(platformId: PlatformId): SessionState
+    suspend fun upsertSession(platformId: PlatformId, session: com.franklinharper.social.media.client.domain.AccountSession)
     suspend fun signOut(platformId: PlatformId)
     suspend fun clearAll()
 }

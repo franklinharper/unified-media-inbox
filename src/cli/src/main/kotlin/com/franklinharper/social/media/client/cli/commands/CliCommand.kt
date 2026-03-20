@@ -11,7 +11,11 @@ sealed interface CliCommand {
         val markSeen: Boolean,
     ) : CliCommand
 
-    data class SignIn(val platform: PlatformId) : CliCommand
+    data class SignIn(
+        val platform: PlatformId,
+        val identifier: String,
+        val password: String,
+    ) : CliCommand
     data class SignOut(val platform: PlatformId) : CliCommand
     data class AddUser(val platform: PlatformId, val user: String) : CliCommand
     data class RemoveUser(val platform: PlatformId, val user: String) : CliCommand

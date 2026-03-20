@@ -1,14 +1,17 @@
 package com.franklinharper.social.media.client.cli.commands
 
 import com.franklinharper.social.media.client.client.ClientRegistry
-import com.franklinharper.social.media.client.client.fake.FakeBlueskyClient
+import com.franklinharper.social.media.client.client.PasswordAuthClient
+import com.franklinharper.social.media.client.client.bluesky.BlueskyClient
 import com.franklinharper.social.media.client.client.fake.FakeTwitterClient
 import com.franklinharper.social.media.client.client.rss.RssClient
 import com.franklinharper.social.media.client.db.JvmDatabaseFactory
 import com.franklinharper.social.media.client.domain.ConfiguredSource
+import com.franklinharper.social.media.client.domain.ClientFailure
 import com.franklinharper.social.media.client.domain.FeedRequest
 import com.franklinharper.social.media.client.domain.FeedSourceStatus
 import com.franklinharper.social.media.client.domain.PlatformId
+import com.franklinharper.social.media.client.domain.SessionState
 import com.franklinharper.social.media.client.domain.SourceContentOrigin
 import com.franklinharper.social.media.client.domain.SourceLoadState
 import com.franklinharper.social.media.client.repository.DefaultFeedRepository
@@ -27,14 +30,22 @@ class DefaultCliApp(
     private val seenRepository = SqlDelightSeenItemRepository(database) { System.currentTimeMillis() }
     private val sessionRepository = SqlDelightSessionRepository(database)
     private val feedCacheRepository = SqlDelightFeedCacheRepository(database) { System.currentTimeMillis() }
-    private val feedRepository = DefaultFeedRepository(
-        clientRegistry = clientRegistry ?: ClientRegistry(
-            listOf(
-                RssClient(),
-                FakeBlueskyClient(itemsByUser = emptyMap()),
-                FakeTwitterClient(itemsByUser = emptyMap()),
+    private val resolvedClientRegistry = clientRegistry ?: ClientRegistry(
+        listOf(
+            RssClient(),
+            BlueskyClient(
+                sessionProvider = {
+                    when (val state = sessionRepository.getSessionState(PlatformId.Bluesky)) {
+                        is SessionState.SignedIn -> state.session
+                        else -> null
+                    }
+                },
             ),
+            FakeTwitterClient(itemsByUser = emptyMap()),
         ),
+    )
+    private val feedRepository = DefaultFeedRepository(
+        clientRegistry = resolvedClientRegistry,
         seenItemRepository = seenRepository,
         feedCacheRepository = feedCacheRepository,
         clock = { System.currentTimeMillis() },
@@ -109,7 +120,21 @@ class DefaultCliApp(
                 }
                 CliResult.Success(listOf(statusOutput, itemsOutput).filter { it.isNotBlank() }.joinToString("\n"))
             }
-            is CliCommand.SignIn -> CliResult.Failure("signin is not implemented yet for ${command.platform.name.lowercase()}")
+            is CliCommand.SignIn -> {
+                val client = resolvedClientRegistry.require(command.platform) as? PasswordAuthClient
+                    ?: return CliResult.Failure("signin is not supported for ${command.platform.name.lowercase()}")
+                val session = try {
+                    client.signIn(command.identifier, command.password)
+                } catch (error: Throwable) {
+                    val message = when (error) {
+                        is ClientFailure -> formatClientError(error.clientError)
+                        else -> error.message ?: "unknown error"
+                    }
+                    return CliResult.Failure("Signin failed for ${command.platform.name.lowercase()}: $message")
+                }
+                sessionRepository.upsertSession(command.platform, session)
+                CliResult.Success("Signed in ${command.platform.name.lowercase()} as ${command.identifier}")
+            }
             is CliCommand.SignOut -> {
                 sessionRepository.signOut(command.platform)
                 CliResult.Success("Signed out ${command.platform.name.lowercase()}")

@@ -83,7 +83,7 @@ class SqlDelightSessionRepository(
         queries.removeAccountSession(platform_id = platformId.serializedName)
     }
 
-    suspend fun upsertSession(platformId: PlatformId, session: AccountSession) {
+    override suspend fun upsertSession(platformId: PlatformId, session: AccountSession) {
         queries.upsertAccountSession(
             platform_id = platformId.serializedName,
             account_id = session.accountId,

@@ -5,11 +5,15 @@ import com.franklinharper.social.media.client.client.fake.FakeBlueskyClient
 import com.franklinharper.social.media.client.client.fake.FakeRssClient
 import com.franklinharper.social.media.client.client.fake.FakeTwitterClient
 import com.franklinharper.social.media.client.client.rss.RssClient
+import com.franklinharper.social.media.client.db.JvmDatabaseFactory
+import com.franklinharper.social.media.client.domain.AccountSession
 import com.franklinharper.social.media.client.domain.ClientError
 import com.franklinharper.social.media.client.domain.FeedItem
 import com.franklinharper.social.media.client.domain.FeedSource
 import com.franklinharper.social.media.client.domain.PlatformId
 import com.franklinharper.social.media.client.domain.SeenState
+import com.franklinharper.social.media.client.domain.SessionState
+import com.franklinharper.social.media.client.repository.SqlDelightSessionRepository
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import kotlin.test.Test
@@ -120,6 +124,83 @@ class DefaultCliAppTest {
 
         assertEquals(
             CliResult.Failure("No sources configured. Use add-feed or add-user, or pass --url/--user."),
+            result,
+        )
+    }
+
+    @Test
+    fun `signin stores bluesky session`() = runBlocking {
+        val dbFile = File.createTempFile("social-cli-test", ".db")
+        dbFile.deleteOnExit()
+        val app = DefaultCliApp(
+            databasePath = dbFile,
+            clientRegistry = ClientRegistry(
+                listOf(
+                    RssClient(fetcher = { RSS_XML }),
+                    FakeBlueskyClient(
+                        itemsByUser = emptyMap(),
+                        sessionsByIdentifier = mapOf(
+                            "frank.bsky.social" to AccountSession(
+                                accountId = "did:plc:abc",
+                                accessToken = "access",
+                                refreshToken = "refresh",
+                            ),
+                        ),
+                    ),
+                    FakeTwitterClient(itemsByUser = emptyMap()),
+                ),
+            ),
+        )
+
+        val result = app.run(
+            listOf(
+                "signin",
+                "--platform",
+                "bluesky",
+                "--identifier",
+                "frank.bsky.social",
+                "--app-password",
+                "app-password",
+            ),
+        )
+
+        val persistedState = SqlDelightSessionRepository(JvmDatabaseFactory.fileBacked(dbFile))
+            .getSessionState(PlatformId.Bluesky)
+
+        assertEquals(CliResult.Success("Signed in bluesky as frank.bsky.social"), result)
+        assertIs<SessionState.SignedIn>(persistedState)
+        assertEquals("did:plc:abc", persistedState.session.accountId)
+    }
+
+    @Test
+    fun `signin reports invalid bluesky credentials`() = runBlocking {
+        val dbFile = File.createTempFile("social-cli-test", ".db")
+        dbFile.deleteOnExit()
+        val app = DefaultCliApp(
+            databasePath = dbFile,
+            clientRegistry = ClientRegistry(
+                listOf(
+                    RssClient(fetcher = { RSS_XML }),
+                    FakeBlueskyClient(itemsByUser = emptyMap()),
+                    FakeTwitterClient(itemsByUser = emptyMap()),
+                ),
+            ),
+        )
+
+        val result = app.run(
+            listOf(
+                "signin",
+                "--platform",
+                "bluesky",
+                "--identifier",
+                "frank.bsky.social",
+                "--app-password",
+                "wrong-password",
+            ),
+        )
+
+        assertEquals(
+            CliResult.Failure("Signin failed for bluesky: authentication error: invalid credentials"),
             result,
         )
     }

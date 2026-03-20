@@ -1,6 +1,8 @@
 package com.franklinharper.social.media.client.client.fake
 
 import com.franklinharper.social.media.client.client.SocialPlatformClient
+import com.franklinharper.social.media.client.client.PasswordAuthClient
+import com.franklinharper.social.media.client.domain.AccountSession
 import com.franklinharper.social.media.client.domain.ClientError
 import com.franklinharper.social.media.client.domain.ClientFailure
 import com.franklinharper.social.media.client.domain.FeedCursor
@@ -50,6 +52,7 @@ class FakeRssClient(
 class FakeBlueskyClient(
     private val itemsByUser: Map<String, List<FeedItem>>,
     private val errorsByUser: Map<String, ClientError> = emptyMap(),
+    private val sessionsByIdentifier: Map<String, AccountSession> = emptyMap(),
 ) : FakeSocialPlatformClient(
     id = PlatformId.Bluesky,
     displayName = "Fake Bluesky",
@@ -61,7 +64,11 @@ class FakeBlueskyClient(
         }.sortedByDescending(FeedItem::publishedAtEpochMillis)
         FeedPage(items = items, nextCursor = null)
     },
-)
+), PasswordAuthClient {
+    override suspend fun signIn(identifier: String, password: String): AccountSession =
+        sessionsByIdentifier[identifier]
+            ?: throw FakeClientException(ClientError.AuthenticationError("invalid credentials"))
+}
 
 class FakeTwitterClient(
     private val itemsByUser: Map<String, List<FeedItem>>,

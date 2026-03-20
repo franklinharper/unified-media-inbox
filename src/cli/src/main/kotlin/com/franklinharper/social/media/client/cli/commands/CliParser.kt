@@ -7,7 +7,7 @@ fun parseCommand(args: List<String>): CliCommand? {
     val rest = args.drop(1)
     return when (command) {
         "list-new-items" -> parseListNewItems(rest)
-        "signin" -> parsePlatformOnly(rest) { platform -> CliCommand.SignIn(platform) }
+        "signin" -> parseSignIn(rest)
         "signout" -> parsePlatformOnly(rest) { platform -> CliCommand.SignOut(platform) }
         "add-user" -> parseUserCommand(rest) { platform, user -> CliCommand.AddUser(platform, user) }
         "remove-user" -> parseUserCommand(rest) { platform, user -> CliCommand.RemoveUser(platform, user) }
@@ -17,6 +17,25 @@ fun parseCommand(args: List<String>): CliCommand? {
         "clear-data" -> CliCommand.ClearData
         else -> null
     }
+}
+
+private fun parseSignIn(args: List<String>): CliCommand.SignIn? {
+    var platform: PlatformId? = null
+    var identifier: String? = null
+    var password: String? = null
+    var index = 0
+    while (index < args.size) {
+        when (val arg = args[index]) {
+            "--platform" -> platform = args.getOrNull(++index)?.toPlatformId() ?: return null
+            "--identifier" -> identifier = args.getOrNull(++index) ?: return null
+            "--app-password" -> password = args.getOrNull(++index) ?: return null
+            else -> return null
+        }
+        index++
+    }
+    if (platform == null || identifier == null || password == null) return null
+    if (platform == PlatformId.Rss || platform == PlatformId.Twitter) return null
+    return CliCommand.SignIn(platform = platform, identifier = identifier, password = password)
 }
 
 private fun parseListNewItems(args: List<String>): CliCommand.ListNewItems? {

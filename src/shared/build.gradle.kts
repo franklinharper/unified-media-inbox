@@ -3,12 +3,16 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
-    alias(libs.plugins.androidLibrary)
+    alias(libs.plugins.androidKotlinMultiplatformLibrary)
+    alias(libs.plugins.kotlinSerialization)
     alias(libs.plugins.sqldelight)
 }
 
 kotlin {
-    androidTarget {
+    androidLibrary {
+        namespace = "com.franklinharper.social.media.client.shared"
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_11)
         }
@@ -35,6 +39,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.serialization.json)
             implementation(libs.sqldelight.runtime)
             implementation(libs.sqldelight.coroutinesExtensions)
         }
@@ -62,17 +67,5 @@ sqldelight {
         create("SocialMediaDatabase") {
             packageName.set("com.franklinharper.social.media.client.db")
         }
-    }
-}
-
-android {
-    namespace = "com.franklinharper.social.media.client.shared"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-    defaultConfig {
-        minSdk = libs.versions.android.minSdk.get().toInt()
     }
 }

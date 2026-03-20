@@ -57,4 +57,43 @@ class CliParserTest {
             parseCommand(listOf("add-user", "--platform", "twitter", "--user", "frank")),
         )
     }
+
+    @Test
+    fun `parses bluesky signin credentials`() {
+        assertEquals(
+            CliCommand.SignIn(
+                platform = PlatformId.Bluesky,
+                identifier = "frank.bsky.social",
+                password = "app-password",
+            ),
+            parseCommand(
+                listOf(
+                    "signin",
+                    "--platform",
+                    "bluesky",
+                    "--identifier",
+                    "frank.bsky.social",
+                    "--app-password",
+                    "app-password",
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun `rejects rss signin`() {
+        assertNull(
+            parseCommand(
+                listOf(
+                    "signin",
+                    "--platform",
+                    "rss",
+                    "--identifier",
+                    "example",
+                    "--app-password",
+                    "secret",
+                ),
+            ),
+        )
+    }
 }
