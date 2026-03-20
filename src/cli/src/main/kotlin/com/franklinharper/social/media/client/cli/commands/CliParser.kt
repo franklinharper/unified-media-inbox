@@ -8,7 +8,8 @@ fun parseCommand(args: List<String>): CliCommand? {
     return when (command) {
         "list-new-items" -> parseListNewItems(rest)
         "signin" -> parseSignIn(rest)
-        "signout" -> parsePlatformOnly(rest) { platform -> CliCommand.SignOut(platform) }
+        "import-follows" -> parseImportFollows(rest)
+        "signout" -> parsePositionalPlatformCommand(rest) { platform -> CliCommand.SignOut(platform) }
         "add-user" -> parseUserCommand(rest) { platform, user -> CliCommand.AddUser(platform, user) }
         "remove-user" -> parseUserCommand(rest) { platform, user -> CliCommand.RemoveUser(platform, user) }
         "add-feed" -> parsePositionalUrlCommand(rest) { url -> CliCommand.AddFeed(url) }
@@ -19,21 +20,17 @@ fun parseCommand(args: List<String>): CliCommand? {
     }
 }
 
+private fun parseImportFollows(args: List<String>): CliCommand.ImportFollows? {
+    val command = parsePositionalPlatformCommand(args) { platform -> CliCommand.ImportFollows(platform) } as? CliCommand.ImportFollows
+        ?: return null
+    return if (command.platform == PlatformId.Bluesky) command else null
+}
+
 private fun parseSignIn(args: List<String>): CliCommand.SignIn? {
-    var platform: PlatformId? = null
-    var identifier: String? = null
-    var password: String? = null
-    var index = 0
-    while (index < args.size) {
-        when (val arg = args[index]) {
-            "--platform" -> platform = args.getOrNull(++index)?.toPlatformId() ?: return null
-            "--identifier" -> identifier = args.getOrNull(++index) ?: return null
-            "--app-password" -> password = args.getOrNull(++index) ?: return null
-            else -> return null
-        }
-        index++
-    }
-    if (platform == null || identifier == null || password == null) return null
+    if (args.size != 3) return null
+    val platform = args[0].toPlatformId() ?: return null
+    val identifier = args[1]
+    val password = args[2]
     if (platform == PlatformId.Rss || platform == PlatformId.Twitter) return null
     return CliCommand.SignIn(platform = platform, identifier = identifier, password = password)
 }
@@ -44,6 +41,7 @@ private fun parseListNewItems(args: List<String>): CliCommand.ListNewItems? {
     val urls = mutableListOf<String>()
     var includeSeen = false
     var markSeen = false
+    var verbose = false
     var index = 0
     while (index < args.size) {
         when (val arg = args[index]) {
@@ -52,32 +50,32 @@ private fun parseListNewItems(args: List<String>): CliCommand.ListNewItems? {
             "--url" -> urls += args.getOrNull(++index) ?: return null
             "--include-seen" -> includeSeen = true
             "--mark-seen" -> markSeen = true
+            "--verbose" -> verbose = true
             else -> return null
         }
         index++
     }
     if (platform == PlatformId.Rss && users.isNotEmpty()) return null
     if (platform != null && platform != PlatformId.Rss && urls.isNotEmpty()) return null
-    return CliCommand.ListNewItems(platform, users, urls, includeSeen, markSeen)
+    return CliCommand.ListNewItems(platform, users, urls, includeSeen, markSeen, verbose)
 }
 
-private fun parsePlatformOnly(
+private fun parsePositionalPlatformCommand(
     args: List<String>,
     factory: (PlatformId) -> CliCommand,
 ): CliCommand? {
-    if (args.size != 2 || args[0] != "--platform") return null
-    return factory(args[1].toPlatformId() ?: return null)
+    if (args.size != 1) return null
+    return factory(args[0].toPlatformId() ?: return null)
 }
 
 private fun parseUserCommand(
     args: List<String>,
     factory: (PlatformId, String) -> CliCommand,
 ): CliCommand? {
-    if (args.size != 4) return null
-    if (args[0] != "--platform" || args[2] != "--user") return null
-    val platform = args[1].toPlatformId() ?: return null
+    if (args.size != 2) return null
+    val platform = args[0].toPlatformId() ?: return null
     if (platform == PlatformId.Rss) return null
-    return factory(platform, args[3])
+    return factory(platform, args[1])
 }
 
 private fun parsePositionalUrlCommand(

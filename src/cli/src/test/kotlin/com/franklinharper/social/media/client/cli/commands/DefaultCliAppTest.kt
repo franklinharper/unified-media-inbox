@@ -68,7 +68,30 @@ class DefaultCliAppTest {
         assertIs<CliResult.Success>(firstRun)
         assertIs<CliResult.Success>(secondRun)
         assertEquals(true, firstRun.output.contains("Second item"))
-        assertEquals(true, secondRun.output.contains("STATUS rss https://example.com/feed.xml refreshed 0 item(s)"))
+        assertEquals("", secondRun.output)
+    }
+
+    @Test
+    fun `verbose list-new-items shows zero item status lines`() = runBlocking {
+        val dbFile = File.createTempFile("social-cli-test", ".db")
+        dbFile.deleteOnExit()
+        val app = DefaultCliApp(
+            databasePath = dbFile,
+            clientRegistry = ClientRegistry(
+                listOf(
+                    RssClient(fetcher = { RSS_XML }),
+                    FakeBlueskyClient(itemsByUser = emptyMap()),
+                    FakeTwitterClient(itemsByUser = emptyMap()),
+                ),
+            ),
+        )
+
+        app.run(listOf("add-feed", "https://example.com/feed.xml"))
+        app.run(listOf("list-new-items", "--mark-seen"))
+        val verboseRun = app.run(listOf("list-new-items", "--verbose"))
+
+        assertIs<CliResult.Success>(verboseRun)
+        assertEquals(true, verboseRun.output.contains("STATUS rss https://example.com/feed.xml refreshed 0 item(s)"))
     }
 
     @Test
@@ -154,7 +177,7 @@ class DefaultCliAppTest {
         )
 
         app.run(listOf("add-feed", "https://example.com/feed.xml"))
-        app.run(listOf("add-user", "--platform", "bluesky", "--user", "frank.bsky.social"))
+        app.run(listOf("add-user", "bluesky", "frank.bsky.social"))
 
         val result = app.run(listOf("list-sources"))
 
@@ -194,6 +217,47 @@ class DefaultCliAppTest {
     }
 
     @Test
+    fun `list-sources reports signed in platform without configured sources`() = runBlocking {
+        val dbFile = File.createTempFile("social-cli-test", ".db")
+        dbFile.deleteOnExit()
+        val app = DefaultCliApp(
+            databasePath = dbFile,
+            clientRegistry = ClientRegistry(
+                listOf(
+                    RssClient(fetcher = { RSS_XML }),
+                    FakeBlueskyClient(
+                        itemsByUser = emptyMap(),
+                        sessionStateProvider = {
+                            SessionState.SignedIn(
+                                AccountSession(
+                                    accountId = "did:plc:abc",
+                                    accessToken = "access",
+                                ),
+                            )
+                        },
+                    ),
+                    FakeTwitterClient(itemsByUser = emptyMap()),
+                ),
+            ),
+        )
+
+        val result = app.run(listOf("list-sources"))
+
+        assertEquals(
+            CliResult.Success(
+                """
+                SESSION rss not-required
+                SESSION bluesky signed-in did:plc:abc
+                SESSION twitter signed-out
+                No sources configured for bluesky.
+                No sources configured.
+                """.trimIndent(),
+            ),
+            result,
+        )
+    }
+
+    @Test
     fun `signin stores bluesky session`() = runBlocking {
         val dbFile = File.createTempFile("social-cli-test", ".db")
         dbFile.deleteOnExit()
@@ -220,11 +284,8 @@ class DefaultCliAppTest {
         val result = app.run(
             listOf(
                 "signin",
-                "--platform",
                 "bluesky",
-                "--identifier",
                 "frank.bsky.social",
-                "--app-password",
                 "app-password",
             ),
         )
@@ -237,6 +298,77 @@ class DefaultCliAppTest {
         assertIs<SessionState.SignedIn>(persistedState)
         assertEquals("did:plc:abc", persistedState.session.accountId)
         assertEquals(true, (listedSources as CliResult.Success).output.contains("SESSION bluesky signed-in did:plc:abc"))
+        assertEquals(true, listedSources.output.contains("No sources configured for bluesky."))
+    }
+
+    @Test
+    fun `import-follows adds followed bluesky handles as sources`() = runBlocking {
+        val dbFile = File.createTempFile("social-cli-test", ".db")
+        dbFile.deleteOnExit()
+        val app = DefaultCliApp(
+            databasePath = dbFile,
+            clientRegistry = ClientRegistry(
+                listOf(
+                    RssClient(fetcher = { RSS_XML }),
+                    FakeBlueskyClient(
+                        itemsByUser = emptyMap(),
+                        sessionsByIdentifier = mapOf(
+                            "frank.bsky.social" to AccountSession(
+                                accountId = "did:plc:abc",
+                                accessToken = "access",
+                                refreshToken = "refresh",
+                            ),
+                        ),
+                        followedProfilesByAccount = mapOf(
+                            "did:plc:abc" to listOf(
+                                com.franklinharper.social.media.client.domain.SocialProfile(
+                                    accountId = "did:plc:alice",
+                                    displayName = "Alice",
+                                    handle = "alice.bsky.social",
+                                ),
+                                com.franklinharper.social.media.client.domain.SocialProfile(
+                                    accountId = "did:plc:bob",
+                                    displayName = "Bob",
+                                    handle = "bob.bsky.social",
+                                ),
+                            ),
+                        ),
+                    ),
+                    FakeTwitterClient(itemsByUser = emptyMap()),
+                ),
+            ),
+        )
+
+        app.run(
+            listOf(
+                "signin",
+                "bluesky",
+                "frank.bsky.social",
+                "app-password",
+            ),
+        )
+
+        val result = app.run(listOf("import-follows", "bluesky"))
+        val listedSources = app.run(listOf("list-sources"))
+
+        assertEquals(CliResult.Success("Imported 2 followed account(s) from bluesky"), result)
+        assertIs<CliResult.Success>(listedSources)
+        assertEquals(true, listedSources.output.contains("SOURCE bluesky alice.bsky.social"))
+        assertEquals(true, listedSources.output.contains("SOURCE bluesky bob.bsky.social"))
+    }
+
+    @Test
+    fun `import-follows requires signed in session`() = runBlocking {
+        val dbFile = File.createTempFile("social-cli-test", ".db")
+        dbFile.deleteOnExit()
+        val app = DefaultCliApp(databasePath = dbFile)
+
+        val result = app.run(listOf("import-follows", "bluesky"))
+
+        assertEquals(
+            CliResult.Failure("Import requires a signed-in bluesky session."),
+            result,
+        )
     }
 
     @Test
@@ -257,11 +389,8 @@ class DefaultCliAppTest {
         val result = app.run(
             listOf(
                 "signin",
-                "--platform",
                 "bluesky",
-                "--identifier",
                 "frank.bsky.social",
-                "--app-password",
                 "wrong-password",
             ),
         )
@@ -282,7 +411,7 @@ class DefaultCliAppTest {
 
         assertIs<CliResult.Failure>(result)
         assertEquals(true, result.message.contains("social-cli add-feed <feed-url>"))
-        assertEquals(true, result.message.contains("social-cli signin --platform bluesky --identifier <handle> --app-password <app-password>"))
+        assertEquals(true, result.message.contains("social-cli signin bluesky <handle> <app-password>"))
     }
 
     private fun feedItem(id: String, source: FeedSource, publishedAt: Long): FeedItem = FeedItem(

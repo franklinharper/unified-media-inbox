@@ -1,6 +1,7 @@
 package com.franklinharper.social.media.client.cli.commands
 
 import com.franklinharper.social.media.client.client.ClientRegistry
+import com.franklinharper.social.media.client.client.FollowingImportClient
 import com.franklinharper.social.media.client.client.PasswordAuthClient
 import com.franklinharper.social.media.client.client.bluesky.BlueskyClient
 import com.franklinharper.social.media.client.client.fake.FakeTwitterClient
@@ -11,6 +12,7 @@ import com.franklinharper.social.media.client.domain.ClientFailure
 import com.franklinharper.social.media.client.domain.FeedRequest
 import com.franklinharper.social.media.client.domain.FeedSourceStatus
 import com.franklinharper.social.media.client.domain.PlatformId
+import com.franklinharper.social.media.client.domain.SocialProfile
 import com.franklinharper.social.media.client.domain.SessionState
 import com.franklinharper.social.media.client.domain.SourceContentOrigin
 import com.franklinharper.social.media.client.domain.SourceLoadState
@@ -82,22 +84,36 @@ class DefaultCliApp(
             }
             CliCommand.ListSources -> {
                 val sources = sourceRepository.listSources()
-                val sessionsOutput = buildList {
+                val sessionStates = buildList {
                     for (client in resolvedClientRegistry.all()) {
-                        add("SESSION ${client.id.name.lowercase()} ${formatSessionState(client.sessionState())}")
+                        add(client.id to client.sessionState())
                     }
-                }.joinToString("\n")
-                val sourcesOutput = if (sources.isEmpty()) {
-                    "No sources configured."
-                } else {
-                    sources.joinToString("\n") { source ->
+                }
+                val sessionsOutput = sessionStates.joinToString("\n") { (platformId, state) ->
+                    "SESSION ${platformId.name.lowercase()} ${formatSessionState(state)}"
+                }
+                val configuredPlatformIds = sources.map(ConfiguredSource::platformId).toSet()
+                val sourceLines = sources.map { source ->
                         when (source) {
                             is ConfiguredSource.RssFeed -> "SOURCE rss ${source.url}"
                             is ConfiguredSource.SocialUser -> "SOURCE ${source.platformId.name.lowercase()} ${source.user}"
                         }
+                }
+                val missingSignedInPlatformLines = sessionStates.mapNotNull { (platformId, state) ->
+                    if (state is SessionState.SignedIn && platformId !in configuredPlatformIds) {
+                        "No sources configured for ${platformId.name.lowercase()}."
+                    } else {
+                        null
                     }
                 }
-                CliResult.Success(listOf(sessionsOutput, sourcesOutput).joinToString("\n"))
+                val detailsOutput = buildList {
+                    addAll(sourceLines)
+                    addAll(missingSignedInPlatformLines)
+                    if (sources.isEmpty()) {
+                        add("No sources configured.")
+                    }
+                }.joinToString("\n")
+                CliResult.Success(listOf(sessionsOutput, detailsOutput).filter { it.isNotBlank() }.joinToString("\n"))
             }
             is CliCommand.ListNewItems -> {
                 val explicitSources = buildList {
@@ -120,9 +136,14 @@ class DefaultCliApp(
                     seenRepository.markSeen(result.items.map { "${it.platformId.name.lowercase()}:${it.itemId}" })
                 }
                 val itemCountBySource = result.items.groupingBy { it.source.cacheKey }.eachCount()
-                val statusOutput = result.sourceStatuses.joinToString("\n") { status ->
-                    formatStatusLine(status, itemCountBySource[status.source.cacheKey] ?: 0)
-                }
+                val statusOutput = result.sourceStatuses.mapNotNull { status ->
+                    val itemCount = itemCountBySource[status.source.cacheKey] ?: 0
+                    if (!command.verbose && status.state == SourceLoadState.Success && itemCount == 0) {
+                        null
+                    } else {
+                        formatStatusLine(status, itemCount)
+                    }
+                }.joinToString("\n")
                 val itemsOutput = result.items.joinToString("\n") { item ->
                     "${item.publishedAtEpochMillis} ${item.platformId.name.lowercase()} ${item.source.displayName} ${item.title ?: item.body ?: item.itemId}"
                 }
@@ -143,6 +164,40 @@ class DefaultCliApp(
                 sessionRepository.upsertSession(command.platform, session)
                 CliResult.Success("Signed in ${command.platform.name.lowercase()} as ${command.identifier}")
             }
+            is CliCommand.ImportFollows -> {
+                val sessionState = sessionRepository.getSessionState(command.platform)
+                val signedInState = sessionState as? SessionState.SignedIn
+                    ?: return CliResult.Failure("Import requires a signed-in ${command.platform.name.lowercase()} session.")
+                val client = resolvedClientRegistry.require(command.platform) as? FollowingImportClient
+                    ?: return CliResult.Failure("import-follows is not supported for ${command.platform.name.lowercase()}")
+                val profiles = try {
+                    client.loadFollowedProfiles(signedInState.session.accountId)
+                } catch (error: Throwable) {
+                    val message = when (error) {
+                        is ClientFailure -> formatClientError(error.clientError)
+                        else -> error.message ?: "unknown error"
+                    }
+                    return CliResult.Failure("Import failed for ${command.platform.name.lowercase()}: $message")
+                }
+                val importedHandles = profiles.mapNotNull(SocialProfile::handle).distinct().sorted()
+                importedHandles.forEach { handle ->
+                    sourceRepository.addSource(
+                        ConfiguredSource.SocialUser(
+                            platformId = command.platform,
+                            user = handle,
+                        ),
+                    )
+                }
+                val skippedCount = profiles.size - importedHandles.size
+                CliResult.Success(
+                    buildString {
+                        append("Imported ${importedHandles.size} followed account(s) from ${command.platform.name.lowercase()}")
+                        if (skippedCount > 0) {
+                            append("; skipped $skippedCount account(s) without handles")
+                        }
+                    },
+                )
+            }
             is CliCommand.SignOut -> {
                 sessionRepository.signOut(command.platform)
                 CliResult.Success("Signed out ${command.platform.name.lowercase()}")
@@ -161,11 +216,12 @@ class DefaultCliApp(
 private val usageText =
     """
     Usage:
-      social-cli list-new-items [--platform <bluesky|twitter|rss>] [--user <handle>]... [--url <feed-url>]... [--include-seen] [--mark-seen]
-      social-cli signin --platform bluesky --identifier <handle> --app-password <app-password>
-      social-cli signout --platform <bluesky|twitter>
-      social-cli add-user --platform <bluesky|twitter> --user <handle>
-      social-cli remove-user --platform <bluesky|twitter> --user <handle>
+      social-cli list-new-items [--platform <bluesky|twitter|rss>] [--user <handle>]... [--url <feed-url>]... [--include-seen] [--mark-seen] [--verbose]
+      social-cli signin bluesky <handle> <app-password>
+      social-cli import-follows bluesky
+      social-cli signout <bluesky|twitter>
+      social-cli add-user <bluesky|twitter> <handle>
+      social-cli remove-user <bluesky|twitter> <handle>
       social-cli add-feed <feed-url>
       social-cli remove-feed <feed-url>
       social-cli list-sources
@@ -173,8 +229,9 @@ private val usageText =
 
     Examples:
       social-cli add-feed https://hnrss.org/newest
+      social-cli import-follows bluesky
       social-cli list-new-items --platform bluesky --user frank.bsky.social
-      social-cli signin --platform bluesky --identifier frank.bsky.social --app-password xxxx-xxxx-xxxx-xxxx
+      social-cli signin bluesky frank.bsky.social xxxx-xxxx-xxxx-xxxx
     """.trimIndent()
 
 private fun formatStatusLine(status: FeedSourceStatus, itemCount: Int): String {

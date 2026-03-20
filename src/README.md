@@ -73,6 +73,7 @@ Examples:
 ```shell
 ./social-cli add-feed https://hnrss.org/newest
 ./social-cli remove-feed https://hnrss.org/newest
+./social-cli import-follows bluesky
 ```
 
 ### Build and Run Web Application

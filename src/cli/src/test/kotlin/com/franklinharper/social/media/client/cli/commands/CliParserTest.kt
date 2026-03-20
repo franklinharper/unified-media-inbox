@@ -20,6 +20,7 @@ class CliParserTest {
                 "sam",
                 "--include-seen",
                 "--mark-seen",
+                "--verbose",
             ),
         )
 
@@ -30,6 +31,7 @@ class CliParserTest {
                 urls = emptyList(),
                 includeSeen = true,
                 markSeen = true,
+                verbose = true,
             ),
             command,
         )
@@ -54,7 +56,7 @@ class CliParserTest {
     fun `parses add-user`() {
         assertEquals(
             CliCommand.AddUser(PlatformId.Twitter, "frank"),
-            parseCommand(listOf("add-user", "--platform", "twitter", "--user", "frank")),
+            parseCommand(listOf("add-user", "twitter", "frank")),
         )
     }
 
@@ -82,14 +84,19 @@ class CliParserTest {
             parseCommand(
                 listOf(
                     "signin",
-                    "--platform",
                     "bluesky",
-                    "--identifier",
                     "frank.bsky.social",
-                    "--app-password",
                     "app-password",
                 ),
             ),
+        )
+    }
+
+    @Test
+    fun `parses bluesky import follows`() {
+        assertEquals(
+            CliCommand.ImportFollows(PlatformId.Bluesky),
+            parseCommand(listOf("import-follows", "bluesky")),
         )
     }
 
@@ -99,11 +106,8 @@ class CliParserTest {
             parseCommand(
                 listOf(
                     "signin",
-                    "--platform",
                     "rss",
-                    "--identifier",
                     "example",
-                    "--app-password",
                     "secret",
                 ),
             ),
