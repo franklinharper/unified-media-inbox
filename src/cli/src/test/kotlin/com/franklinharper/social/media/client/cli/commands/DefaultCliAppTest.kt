@@ -37,7 +37,7 @@ class DefaultCliAppTest {
             ),
         )
 
-        app.run(listOf("add-feed", "--url", "https://example.com/feed.xml"))
+        app.run(listOf("add-feed", "https://example.com/feed.xml"))
         val result = app.run(listOf("list-new-items"))
 
         assertIs<CliResult.Success>(result)
@@ -61,7 +61,7 @@ class DefaultCliAppTest {
             ),
         )
 
-        app.run(listOf("add-feed", "--url", "https://example.com/feed.xml"))
+        app.run(listOf("add-feed", "https://example.com/feed.xml"))
         val firstRun = app.run(listOf("list-new-items", "--mark-seen"))
         val secondRun = app.run(listOf("list-new-items"))
 
@@ -90,7 +90,7 @@ class DefaultCliAppTest {
                 ),
             ),
         )
-        initialApp.run(listOf("add-feed", "--url", source.sourceId))
+        initialApp.run(listOf("add-feed", source.sourceId))
         initialApp.run(listOf("list-new-items"))
 
         val failingApp = DefaultCliApp(
@@ -153,7 +153,7 @@ class DefaultCliAppTest {
             ),
         )
 
-        app.run(listOf("add-feed", "--url", "https://example.com/feed.xml"))
+        app.run(listOf("add-feed", "https://example.com/feed.xml"))
         app.run(listOf("add-user", "--platform", "bluesky", "--user", "frank.bsky.social"))
 
         val result = app.run(listOf("list-sources"))
@@ -270,6 +270,19 @@ class DefaultCliAppTest {
             CliResult.Failure("Signin failed for bluesky: authentication error: invalid credentials"),
             result,
         )
+    }
+
+    @Test
+    fun `invalid add-feed usage shows positional syntax`() = runBlocking {
+        val dbFile = File.createTempFile("social-cli-test", ".db")
+        dbFile.deleteOnExit()
+        val app = DefaultCliApp(databasePath = dbFile)
+
+        val result = app.run(listOf("add-feed", "--url", "https://hnrss.org/newest"))
+
+        assertIs<CliResult.Failure>(result)
+        assertEquals(true, result.message.contains("social-cli add-feed <feed-url>"))
+        assertEquals(true, result.message.contains("social-cli signin --platform bluesky --identifier <handle> --app-password <app-password>"))
     }
 
     private fun feedItem(id: String, source: FeedSource, publishedAt: Long): FeedItem = FeedItem(

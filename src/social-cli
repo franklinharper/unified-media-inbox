@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALL_DIR="$ROOT_DIR/cli/build/install/cli"
+LAUNCHER="$INSTALL_DIR/bin/cli"
+
+rebuild=0
+if [[ "${1:-}" == "--rebuild" ]]; then
+  rebuild=1
+  shift
+fi
+
+needs_rebuild() {
+  if [[ ! -x "$LAUNCHER" ]]; then
+    return 0
+  fi
+
+  local tracked_files=(
+    "$ROOT_DIR/cli/build.gradle.kts"
+    "$ROOT_DIR/shared/build.gradle.kts"
+    "$ROOT_DIR/settings.gradle.kts"
+    "$ROOT_DIR/gradle/libs.versions.toml"
+  )
+
+  for path in "${tracked_files[@]}"; do
+    if [[ "$path" -nt "$LAUNCHER" ]]; then
+      return 0
+    fi
+  done
+
+  if find "$ROOT_DIR/cli/src" "$ROOT_DIR/shared/src" -type f -newer "$LAUNCHER" -print -quit | grep -q .; then
+    return 0
+  fi
+
+  return 1
+}
+
+if [[ $rebuild -eq 1 ]] || needs_rebuild; then
+  "$ROOT_DIR/gradlew" --quiet :cli:installDist
+fi
+
+exec "$LAUNCHER" "$@"

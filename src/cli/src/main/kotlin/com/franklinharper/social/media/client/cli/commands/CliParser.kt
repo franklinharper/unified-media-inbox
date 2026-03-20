@@ -11,8 +11,8 @@ fun parseCommand(args: List<String>): CliCommand? {
         "signout" -> parsePlatformOnly(rest) { platform -> CliCommand.SignOut(platform) }
         "add-user" -> parseUserCommand(rest) { platform, user -> CliCommand.AddUser(platform, user) }
         "remove-user" -> parseUserCommand(rest) { platform, user -> CliCommand.RemoveUser(platform, user) }
-        "add-feed" -> parseUrlCommand(rest) { url -> CliCommand.AddFeed(url) }
-        "remove-feed" -> parseUrlCommand(rest) { url -> CliCommand.RemoveFeed(url) }
+        "add-feed" -> parsePositionalUrlCommand(rest) { url -> CliCommand.AddFeed(url) }
+        "remove-feed" -> parsePositionalUrlCommand(rest) { url -> CliCommand.RemoveFeed(url) }
         "list-sources" -> CliCommand.ListSources
         "clear-data" -> CliCommand.ClearData
         else -> null
@@ -80,12 +80,12 @@ private fun parseUserCommand(
     return factory(platform, args[3])
 }
 
-private fun parseUrlCommand(
+private fun parsePositionalUrlCommand(
     args: List<String>,
     factory: (String) -> CliCommand,
 ): CliCommand? {
-    if (args.size != 2 || args[0] != "--url") return null
-    return factory(args[1])
+    if (args.size != 1) return null
+    return factory(args[0])
 }
 
 private fun String.toPlatformId(): PlatformId? = when (lowercase()) {

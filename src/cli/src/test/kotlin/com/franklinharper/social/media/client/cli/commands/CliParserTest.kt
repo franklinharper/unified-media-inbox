@@ -59,6 +59,19 @@ class CliParserTest {
     }
 
     @Test
+    fun `parses add-feed with positional url`() {
+        assertEquals(
+            CliCommand.AddFeed("https://hnrss.org/newest"),
+            parseCommand(listOf("add-feed", "https://hnrss.org/newest")),
+        )
+    }
+
+    @Test
+    fun `rejects add-feed with legacy url flag`() {
+        assertNull(parseCommand(listOf("add-feed", "--url", "https://hnrss.org/newest")))
+    }
+
+    @Test
     fun `parses bluesky signin credentials`() {
         assertEquals(
             CliCommand.SignIn(

@@ -158,8 +158,24 @@ class DefaultCliApp(
     }
 }
 
-private const val usageText =
-    "Usage: social-cli list-new-items|signin|signout|add-user|remove-user|add-feed|remove-feed|list-sources|clear-data"
+private val usageText =
+    """
+    Usage:
+      social-cli list-new-items [--platform <bluesky|twitter|rss>] [--user <handle>]... [--url <feed-url>]... [--include-seen] [--mark-seen]
+      social-cli signin --platform bluesky --identifier <handle> --app-password <app-password>
+      social-cli signout --platform <bluesky|twitter>
+      social-cli add-user --platform <bluesky|twitter> --user <handle>
+      social-cli remove-user --platform <bluesky|twitter> --user <handle>
+      social-cli add-feed <feed-url>
+      social-cli remove-feed <feed-url>
+      social-cli list-sources
+      social-cli clear-data
+
+    Examples:
+      social-cli add-feed https://hnrss.org/newest
+      social-cli list-new-items --platform bluesky --user frank.bsky.social
+      social-cli signin --platform bluesky --identifier frank.bsky.social --app-password xxxx-xxxx-xxxx-xxxx
+    """.trimIndent()
 
 private fun formatStatusLine(status: FeedSourceStatus, itemCount: Int): String {
     val sourceLabel = "${status.source.platformId.name.lowercase()} ${status.source.cliLabel}"

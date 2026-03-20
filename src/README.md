@@ -57,6 +57,24 @@ in your IDE’s toolbar or run it directly from the terminal:
   .\gradlew.bat :server:run
   ```
 
+### Run the Social CLI
+
+For normal CLI use, prefer the repo-local launcher instead of `gradlew :cli:run`. It installs the CLI distribution once and then runs the generated binary directly, which avoids most Gradle noise on repeated runs.
+
+- on macOS/Linux
+  ```shell
+  ./social-cli list-sources
+  ./social-cli list-new-items --platform bluesky --user frank.bsky.social
+  ```
+
+Use `./social-cli --rebuild ...` after changing CLI code and wanting a fresh install.
+
+Examples:
+```shell
+./social-cli add-feed https://hnrss.org/newest
+./social-cli remove-feed https://hnrss.org/newest
+```
+
 ### Build and Run Web Application
 
 To build and run the development version of the web app, use the run configuration from the run widget
