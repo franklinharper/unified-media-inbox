@@ -53,9 +53,11 @@ class FakeBlueskyClient(
     private val itemsByUser: Map<String, List<FeedItem>>,
     private val errorsByUser: Map<String, ClientError> = emptyMap(),
     private val sessionsByIdentifier: Map<String, AccountSession> = emptyMap(),
+    sessionStateProvider: suspend () -> SessionState = { SessionState.SignedOut },
 ) : FakeSocialPlatformClient(
     id = PlatformId.Bluesky,
     displayName = "Fake Bluesky",
+    sessionStateProvider = sessionStateProvider,
     feedProvider = { query, _ ->
         val socialQuery = query as? FeedQuery.SocialUsers ?: error("FakeBlueskyClient only supports SocialUsers queries")
         val items = socialQuery.users.flatMap { user ->
@@ -73,9 +75,11 @@ class FakeBlueskyClient(
 class FakeTwitterClient(
     private val itemsByUser: Map<String, List<FeedItem>>,
     private val errorsByUser: Map<String, ClientError> = emptyMap(),
+    sessionStateProvider: suspend () -> SessionState = { SessionState.SignedOut },
 ) : FakeSocialPlatformClient(
     id = PlatformId.Twitter,
     displayName = "Fake Twitter",
+    sessionStateProvider = sessionStateProvider,
     feedProvider = { query, _ ->
         val socialQuery = query as? FeedQuery.SocialUsers ?: error("FakeTwitterClient only supports SocialUsers queries")
         val items = socialQuery.users.flatMap { user ->

@@ -129,6 +129,71 @@ class DefaultCliAppTest {
     }
 
     @Test
+    fun `list-sources shows sessions and configured sources`() = runBlocking {
+        val dbFile = File.createTempFile("social-cli-test", ".db")
+        dbFile.deleteOnExit()
+        val app = DefaultCliApp(
+            databasePath = dbFile,
+            clientRegistry = ClientRegistry(
+                listOf(
+                    RssClient(fetcher = { RSS_XML }),
+                    FakeBlueskyClient(
+                        itemsByUser = emptyMap(),
+                        sessionStateProvider = {
+                            SessionState.SignedIn(
+                                AccountSession(
+                                    accountId = "did:plc:abc",
+                                    accessToken = "access",
+                                ),
+                            )
+                        },
+                    ),
+                    FakeTwitterClient(itemsByUser = emptyMap()),
+                ),
+            ),
+        )
+
+        app.run(listOf("add-feed", "--url", "https://example.com/feed.xml"))
+        app.run(listOf("add-user", "--platform", "bluesky", "--user", "frank.bsky.social"))
+
+        val result = app.run(listOf("list-sources"))
+
+        assertEquals(
+            CliResult.Success(
+                """
+                SESSION rss not-required
+                SESSION bluesky signed-in did:plc:abc
+                SESSION twitter signed-out
+                SOURCE bluesky frank.bsky.social
+                SOURCE rss https://example.com/feed.xml
+                """.trimIndent(),
+            ),
+            result,
+        )
+    }
+
+    @Test
+    fun `list-sources reports when no sources are configured`() = runBlocking {
+        val dbFile = File.createTempFile("social-cli-test", ".db")
+        dbFile.deleteOnExit()
+        val app = DefaultCliApp(databasePath = dbFile)
+
+        val result = app.run(listOf("list-sources"))
+
+        assertEquals(
+            CliResult.Success(
+                """
+                SESSION rss not-required
+                SESSION bluesky signed-out
+                SESSION twitter signed-out
+                No sources configured.
+                """.trimIndent(),
+            ),
+            result,
+        )
+    }
+
+    @Test
     fun `signin stores bluesky session`() = runBlocking {
         val dbFile = File.createTempFile("social-cli-test", ".db")
         dbFile.deleteOnExit()
@@ -166,10 +231,12 @@ class DefaultCliAppTest {
 
         val persistedState = SqlDelightSessionRepository(JvmDatabaseFactory.fileBacked(dbFile))
             .getSessionState(PlatformId.Bluesky)
+        val listedSources = DefaultCliApp(databasePath = dbFile).run(listOf("list-sources"))
 
         assertEquals(CliResult.Success("Signed in bluesky as frank.bsky.social"), result)
         assertIs<SessionState.SignedIn>(persistedState)
         assertEquals("did:plc:abc", persistedState.session.accountId)
+        assertEquals(true, (listedSources as CliResult.Success).output.contains("SESSION bluesky signed-in did:plc:abc"))
     }
 
     @Test

@@ -82,14 +82,22 @@ class DefaultCliApp(
             }
             CliCommand.ListSources -> {
                 val sources = sourceRepository.listSources()
-                CliResult.Success(
+                val sessionsOutput = buildList {
+                    for (client in resolvedClientRegistry.all()) {
+                        add("SESSION ${client.id.name.lowercase()} ${formatSessionState(client.sessionState())}")
+                    }
+                }.joinToString("\n")
+                val sourcesOutput = if (sources.isEmpty()) {
+                    "No sources configured."
+                } else {
                     sources.joinToString("\n") { source ->
                         when (source) {
-                            is ConfiguredSource.RssFeed -> "rss ${source.url}"
-                            is ConfiguredSource.SocialUser -> "${source.platformId.name.lowercase()} ${source.user}"
+                            is ConfiguredSource.RssFeed -> "SOURCE rss ${source.url}"
+                            is ConfiguredSource.SocialUser -> "SOURCE ${source.platformId.name.lowercase()} ${source.user}"
                         }
-                    },
-                )
+                    }
+                }
+                CliResult.Success(listOf(sessionsOutput, sourcesOutput).joinToString("\n"))
             }
             is CliCommand.ListNewItems -> {
                 val explicitSources = buildList {
@@ -182,4 +190,11 @@ private fun formatClientError(error: com.franklinharper.social.media.client.doma
     is com.franklinharper.social.media.client.domain.ClientError.PermanentFailure -> "permanent failure${error.message?.let { ": $it" }.orEmpty()}"
     is com.franklinharper.social.media.client.domain.ClientError.RateLimitError -> "rate limited${error.retryAfterMillis?.let { " (retry after ${it}ms)" }.orEmpty()}"
     is com.franklinharper.social.media.client.domain.ClientError.TemporaryFailure -> "temporary failure${error.message?.let { ": $it" }.orEmpty()}"
+}
+
+private fun formatSessionState(state: SessionState): String = when (state) {
+    SessionState.NotRequired -> "not-required"
+    SessionState.SignedOut -> "signed-out"
+    is SessionState.SignedIn -> "signed-in ${state.session.accountId}"
+    is SessionState.Expired -> "expired${state.reason?.let { ": $it" }.orEmpty()}"
 }
