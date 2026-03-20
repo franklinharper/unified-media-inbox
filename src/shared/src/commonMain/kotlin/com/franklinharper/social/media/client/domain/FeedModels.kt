@@ -107,6 +107,7 @@ data class FeedLoadResult(
 data class FeedSourceStatus(
     val source: FeedSource,
     val state: SourceLoadState,
+    val contentOrigin: SourceContentOrigin,
 )
 
 data class FeedSyncState(
@@ -119,4 +120,10 @@ sealed interface SourceLoadState {
     data object Loading : SourceLoadState
     data object Success : SourceLoadState
     data class Error(val error: ClientError) : SourceLoadState
+}
+
+enum class SourceContentOrigin {
+    Refresh,
+    Cache,
+    None,
 }

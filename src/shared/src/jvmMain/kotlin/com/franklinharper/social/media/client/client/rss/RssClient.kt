@@ -2,6 +2,7 @@ package com.franklinharper.social.media.client.client.rss
 
 import com.franklinharper.social.media.client.client.SocialPlatformClient
 import com.franklinharper.social.media.client.domain.ClientError
+import com.franklinharper.social.media.client.domain.ClientFailure
 import com.franklinharper.social.media.client.domain.FeedCursor
 import com.franklinharper.social.media.client.domain.FeedItem
 import com.franklinharper.social.media.client.domain.FeedPage
@@ -157,8 +158,8 @@ class RssClient(
 }
 
 class RssClientException(
-    val clientError: ClientError,
-) : RuntimeException(clientError.toString())
+    override val clientError: ClientError,
+) : RuntimeException(clientError.toString()), ClientFailure
 
 private fun Element.childElements(localName: String): List<Element> =
     buildList {

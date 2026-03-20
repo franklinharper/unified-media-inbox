@@ -10,6 +10,7 @@ import com.franklinharper.social.media.client.domain.FeedRequest
 import com.franklinharper.social.media.client.domain.FeedSource
 import com.franklinharper.social.media.client.domain.PlatformId
 import com.franklinharper.social.media.client.domain.SeenState
+import com.franklinharper.social.media.client.domain.SourceContentOrigin
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -42,6 +43,7 @@ class DefaultFeedRepositoryTest {
                     ),
                 ),
                 seenItemRepository = InMemorySeenItemRepository(),
+                feedCacheRepository = InMemoryFeedCacheRepository(),
             )
 
             val result = repository.loadFeedItems(
@@ -55,6 +57,10 @@ class DefaultFeedRepositoryTest {
 
             assertEquals(listOf("bsky-1", "rss-1"), result.items.map(FeedItem::itemId))
             assertEquals(2, result.sourceStatuses.size)
+            assertEquals(
+                listOf(SourceContentOrigin.Refresh, SourceContentOrigin.Refresh),
+                result.sourceStatuses.map { it.contentOrigin },
+            )
         }
     }
 
@@ -77,6 +83,7 @@ class DefaultFeedRepositoryTest {
                     ),
                 ),
                 seenItemRepository = seenRepository,
+                feedCacheRepository = InMemoryFeedCacheRepository(),
             )
 
             val unseenOnly = repository.loadFeedItems(
@@ -117,6 +124,7 @@ class DefaultFeedRepositoryTest {
                     ),
                 ),
                 seenItemRepository = InMemorySeenItemRepository(),
+                feedCacheRepository = InMemoryFeedCacheRepository(),
             )
 
             val result = repository.loadFeedItems(
@@ -131,6 +139,71 @@ class DefaultFeedRepositoryTest {
             assertEquals(listOf("rss-1"), result.items.map(FeedItem::itemId))
             val errorStatus = result.sourceStatuses.single { it.source.sourceId == badSourceUrl }
             assertIs<com.franklinharper.social.media.client.domain.SourceLoadState.Error>(errorStatus.state)
+            assertEquals(SourceContentOrigin.None, errorStatus.contentOrigin)
+        }
+    }
+
+    @Test
+    fun `loadFeedItems falls back to cached items when refresh fails`() {
+        runBlocking {
+            val source = FeedSource(PlatformId.Rss, "https://example.com/feed.xml", "RSS Feed")
+            val cacheRepository = InMemoryFeedCacheRepository().apply {
+                replaceItems(
+                    source = source,
+                    items = listOf(feedItem("cached-1", PlatformId.Rss, source, 150L)),
+                    nextCursor = "cursor-1",
+                    refreshedAtEpochMillis = 500L,
+                )
+            }
+            val repository = DefaultFeedRepository(
+                clientRegistry = ClientRegistry(
+                    listOf(
+                        FakeRssClient(
+                            itemsByUrl = emptyMap(),
+                            errorsByUrl = mapOf(source.sourceId to ClientError.NetworkError("offline")),
+                        ),
+                    ),
+                ),
+                seenItemRepository = InMemorySeenItemRepository(),
+                feedCacheRepository = cacheRepository,
+            )
+
+            val result = repository.loadFeedItems(
+                FeedRequest(sources = listOf(ConfiguredSource.RssFeed(url = source.sourceId))),
+            )
+
+            assertEquals(listOf("cached-1"), result.items.map(FeedItem::itemId))
+            assertIs<com.franklinharper.social.media.client.domain.SourceLoadState.Error>(result.sourceStatuses.single().state)
+            assertEquals(SourceContentOrigin.Cache, result.sourceStatuses.single().contentOrigin)
+        }
+    }
+
+    @Test
+    fun `loadFeedItems stores refreshed items in cache`() {
+        runBlocking {
+            val source = FeedSource(PlatformId.Rss, "https://example.com/feed.xml", "RSS Feed")
+            val cacheRepository = InMemoryFeedCacheRepository()
+            val repository = DefaultFeedRepository(
+                clientRegistry = ClientRegistry(
+                    listOf(
+                        FakeRssClient(
+                            itemsByUrl = mapOf(
+                                source.sourceId to listOf(feedItem("rss-1", PlatformId.Rss, source, 100L)),
+                            ),
+                        ),
+                    ),
+                ),
+                seenItemRepository = InMemorySeenItemRepository(),
+                feedCacheRepository = cacheRepository,
+                clock = { 999L },
+            )
+
+            repository.loadFeedItems(
+                FeedRequest(sources = listOf(ConfiguredSource.RssFeed(url = source.sourceId))),
+            )
+
+            assertEquals(listOf("rss-1"), cacheRepository.readItems(source, includeSeen = true).map(FeedItem::itemId))
+            assertEquals(999L, cacheRepository.getSyncState(source)?.lastRefreshedAtEpochMillis)
         }
     }
 
@@ -169,3 +242,38 @@ private class InMemorySeenItemRepository(
         seenKeys.clear()
     }
 }
+
+private class InMemoryFeedCacheRepository : FeedCacheRepository {
+    private val itemsBySource = mutableMapOf<String, List<FeedItem>>()
+    private val syncStateBySource = mutableMapOf<String, com.franklinharper.social.media.client.domain.FeedSyncState>()
+
+    override suspend fun readItems(source: FeedSource, includeSeen: Boolean): List<FeedItem> =
+        itemsBySource[source.cacheKey].orEmpty()
+
+    override suspend fun replaceItems(
+        source: FeedSource,
+        items: List<FeedItem>,
+        nextCursor: String?,
+        refreshedAtEpochMillis: Long?,
+    ) {
+        itemsBySource[source.cacheKey] = items
+        syncStateBySource[source.cacheKey] = com.franklinharper.social.media.client.domain.FeedSyncState(
+            source = source,
+            nextCursor = nextCursor?.let { value ->
+                com.franklinharper.social.media.client.domain.FeedCursor(value)
+            },
+            lastRefreshedAtEpochMillis = refreshedAtEpochMillis,
+        )
+    }
+
+    override suspend fun getSyncState(source: FeedSource): com.franklinharper.social.media.client.domain.FeedSyncState? =
+        syncStateBySource[source.cacheKey]
+
+    override suspend fun clearAll() {
+        itemsBySource.clear()
+        syncStateBySource.clear()
+    }
+}
+
+private val FeedSource.cacheKey: String
+    get() = "${platformId.name.lowercase()}:$sourceId"

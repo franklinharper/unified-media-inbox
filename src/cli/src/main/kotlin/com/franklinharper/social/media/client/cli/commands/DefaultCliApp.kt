@@ -7,7 +7,9 @@ import com.franklinharper.social.media.client.client.rss.RssClient
 import com.franklinharper.social.media.client.db.JvmDatabaseFactory
 import com.franklinharper.social.media.client.domain.ConfiguredSource
 import com.franklinharper.social.media.client.domain.FeedRequest
+import com.franklinharper.social.media.client.domain.FeedSourceStatus
 import com.franklinharper.social.media.client.domain.PlatformId
+import com.franklinharper.social.media.client.domain.SourceContentOrigin
 import com.franklinharper.social.media.client.domain.SourceLoadState
 import com.franklinharper.social.media.client.repository.DefaultFeedRepository
 import com.franklinharper.social.media.client.repository.SqlDelightConfiguredSourceRepository
@@ -34,6 +36,8 @@ class DefaultCliApp(
             ),
         ),
         seenItemRepository = seenRepository,
+        feedCacheRepository = feedCacheRepository,
+        clock = { System.currentTimeMillis() },
     )
 
     override suspend fun run(args: List<String>): CliResult {
@@ -84,6 +88,9 @@ class DefaultCliApp(
                     })
                 }
                 val sources = if (explicitSources.isEmpty()) sourceRepository.listSources() else explicitSources
+                if (sources.isEmpty()) {
+                    return CliResult.Failure("No sources configured. Use add-feed or add-user, or pass --url/--user.")
+                }
                 val result = feedRepository.loadFeedItems(
                     FeedRequest(
                         sources = sources,
@@ -93,16 +100,14 @@ class DefaultCliApp(
                 if (command.markSeen) {
                     seenRepository.markSeen(result.items.map { "${it.platformId.name.lowercase()}:${it.itemId}" })
                 }
+                val itemCountBySource = result.items.groupingBy { it.source.cacheKey }.eachCount()
+                val statusOutput = result.sourceStatuses.joinToString("\n") { status ->
+                    formatStatusLine(status, itemCountBySource[status.source.cacheKey] ?: 0)
+                }
                 val itemsOutput = result.items.joinToString("\n") { item ->
                     "${item.publishedAtEpochMillis} ${item.platformId.name.lowercase()} ${item.source.displayName} ${item.title ?: item.body ?: item.itemId}"
                 }
-                val errorOutput = result.sourceStatuses
-                    .filter { it.state is SourceLoadState.Error }
-                    .joinToString("\n") { status ->
-                        val error = (status.state as SourceLoadState.Error).error
-                        "ERROR ${status.source.displayName}: $error"
-                    }
-                CliResult.Success(listOf(itemsOutput, errorOutput).filter { it.isNotBlank() }.joinToString("\n"))
+                CliResult.Success(listOf(statusOutput, itemsOutput).filter { it.isNotBlank() }.joinToString("\n"))
             }
             is CliCommand.SignIn -> CliResult.Failure("signin is not implemented yet for ${command.platform.name.lowercase()}")
             is CliCommand.SignOut -> {
@@ -122,3 +127,34 @@ class DefaultCliApp(
 
 private const val usageText =
     "Usage: social-cli list-new-items|signin|signout|add-user|remove-user|add-feed|remove-feed|list-sources|clear-data"
+
+private fun formatStatusLine(status: FeedSourceStatus, itemCount: Int): String {
+    val sourceLabel = "${status.source.platformId.name.lowercase()} ${status.source.cliLabel}"
+    return when (val state = status.state) {
+        SourceLoadState.Loading -> "STATUS $sourceLabel loading"
+        SourceLoadState.Success -> "STATUS $sourceLabel refreshed $itemCount item(s)"
+        is SourceLoadState.Error -> when (status.contentOrigin) {
+            SourceContentOrigin.Cache -> "STATUS $sourceLabel using cache with $itemCount item(s) after ${formatClientError(state.error)}"
+            SourceContentOrigin.None -> "STATUS $sourceLabel failed with ${formatClientError(state.error)}"
+            SourceContentOrigin.Refresh -> "STATUS $sourceLabel refreshed $itemCount item(s)"
+        }
+    }
+}
+
+private val com.franklinharper.social.media.client.domain.FeedSource.cacheKey: String
+    get() = "${platformId.name.lowercase()}:$sourceId"
+
+private val com.franklinharper.social.media.client.domain.FeedSource.cliLabel: String
+    get() = when (platformId) {
+        PlatformId.Rss -> sourceId
+        else -> displayName
+    }
+
+private fun formatClientError(error: com.franklinharper.social.media.client.domain.ClientError): String = when (error) {
+    is com.franklinharper.social.media.client.domain.ClientError.AuthenticationError -> "authentication error${error.message?.let { ": $it" }.orEmpty()}"
+    is com.franklinharper.social.media.client.domain.ClientError.NetworkError -> "network error${error.message?.let { ": $it" }.orEmpty()}"
+    is com.franklinharper.social.media.client.domain.ClientError.ParsingError -> "parsing error${error.message?.let { ": $it" }.orEmpty()}"
+    is com.franklinharper.social.media.client.domain.ClientError.PermanentFailure -> "permanent failure${error.message?.let { ": $it" }.orEmpty()}"
+    is com.franklinharper.social.media.client.domain.ClientError.RateLimitError -> "rate limited${error.retryAfterMillis?.let { " (retry after ${it}ms)" }.orEmpty()}"
+    is com.franklinharper.social.media.client.domain.ClientError.TemporaryFailure -> "temporary failure${error.message?.let { ": $it" }.orEmpty()}"
+}

@@ -3,6 +3,7 @@ package com.franklinharper.social.media.client.repository
 import com.franklinharper.social.media.client.client.ClientRegistry
 import com.franklinharper.social.media.client.client.fake.FakeClientException
 import com.franklinharper.social.media.client.domain.ClientError
+import com.franklinharper.social.media.client.domain.ClientFailure
 import com.franklinharper.social.media.client.domain.ConfiguredSource
 import com.franklinharper.social.media.client.domain.FeedItem
 import com.franklinharper.social.media.client.domain.FeedLoadResult
@@ -11,6 +12,7 @@ import com.franklinharper.social.media.client.domain.FeedRequest
 import com.franklinharper.social.media.client.domain.FeedSource
 import com.franklinharper.social.media.client.domain.FeedSourceStatus
 import com.franklinharper.social.media.client.domain.PlatformId
+import com.franklinharper.social.media.client.domain.SourceContentOrigin
 import com.franklinharper.social.media.client.domain.SourceLoadState
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -19,11 +21,13 @@ import kotlinx.coroutines.coroutineScope
 class DefaultFeedRepository(
     private val clientRegistry: ClientRegistry,
     private val seenItemRepository: SeenItemRepository,
+    private val feedCacheRepository: FeedCacheRepository? = null,
+    private val clock: () -> Long = { 0L },
 ) : FeedRepository {
     override suspend fun loadFeedItems(request: FeedRequest): FeedLoadResult = coroutineScope {
         val loadResults = request.sources.map { source ->
             async {
-                loadSource(source)
+                loadSource(source, request.includeSeen)
             }
         }.awaitAll()
 
@@ -42,25 +46,35 @@ class DefaultFeedRepository(
         )
     }
 
-    private suspend fun loadSource(source: ConfiguredSource): SourceLoadResult {
+    private suspend fun loadSource(source: ConfiguredSource, includeSeen: Boolean): SourceLoadResult {
         val feedSource = source.toFeedSource()
         val query = source.toFeedQuery()
         val client = clientRegistry.require(source.platformId)
+        val cachedItems = feedCacheRepository?.readItems(feedSource, includeSeen = true).orEmpty()
         return try {
             val page = client.loadFeed(query)
-            SourceLoadResult(
+            feedCacheRepository?.replaceItems(
+                source = feedSource,
                 items = page.items,
+                nextCursor = page.nextCursor?.value,
+                refreshedAtEpochMillis = clock(),
+            )
+            SourceLoadResult(
+                items = page.items.filteredBySeen(includeSeen, seenItemRepository),
                 status = FeedSourceStatus(
                     source = feedSource,
                     state = SourceLoadState.Success,
+                    contentOrigin = SourceContentOrigin.Refresh,
                 ),
             )
         } catch (error: Throwable) {
+            val filteredCachedItems = cachedItems.filteredBySeen(includeSeen, seenItemRepository)
             SourceLoadResult(
-                items = emptyList(),
+                items = filteredCachedItems,
                 status = FeedSourceStatus(
                     source = feedSource,
                     state = SourceLoadState.Error(error.toClientError()),
+                    contentOrigin = if (filteredCachedItems.isEmpty()) SourceContentOrigin.None else SourceContentOrigin.Cache,
                 ),
             )
         }
@@ -91,7 +105,7 @@ private fun ConfiguredSource.toFeedSource(): FeedSource = when (this) {
 }
 
 private fun Throwable.toClientError(): ClientError = when (this) {
-    is FakeClientException -> clientError
+    is ClientFailure -> clientError
     else -> ClientError.TemporaryFailure(message)
 }
 
@@ -100,3 +114,15 @@ private val FeedItem.cacheKey: String
 
 private fun FeedItem.withSeenState(isSeen: Boolean): FeedItem =
     copy(seenState = if (isSeen) com.franklinharper.social.media.client.domain.SeenState.Seen else com.franklinharper.social.media.client.domain.SeenState.Unseen)
+
+private suspend fun List<FeedItem>.filteredBySeen(
+    includeSeen: Boolean,
+    seenItemRepository: SeenItemRepository,
+): List<FeedItem> = buildList {
+    for (item in this@filteredBySeen) {
+        val isSeen = seenItemRepository.isSeen(item.cacheKey)
+        if (includeSeen || !isSeen) {
+            add(item.withSeenState(isSeen))
+        }
+    }
+}

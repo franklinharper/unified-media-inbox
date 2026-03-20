@@ -2,6 +2,7 @@ package com.franklinharper.social.media.client.client.fake
 
 import com.franklinharper.social.media.client.client.SocialPlatformClient
 import com.franklinharper.social.media.client.domain.ClientError
+import com.franklinharper.social.media.client.domain.ClientFailure
 import com.franklinharper.social.media.client.domain.FeedCursor
 import com.franklinharper.social.media.client.domain.FeedItem
 import com.franklinharper.social.media.client.domain.FeedPage
@@ -11,8 +12,8 @@ import com.franklinharper.social.media.client.domain.SessionState
 import com.franklinharper.social.media.client.domain.SocialProfile
 
 class FakeClientException(
-    val clientError: ClientError,
-) : RuntimeException(clientError.toString())
+    override val clientError: ClientError,
+) : RuntimeException(clientError.toString()), ClientFailure
 
 open class FakeSocialPlatformClient(
     override val id: PlatformId,
