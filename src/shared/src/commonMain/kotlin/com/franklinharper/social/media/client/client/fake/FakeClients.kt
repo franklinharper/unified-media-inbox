@@ -1,7 +1,8 @@
 package com.franklinharper.social.media.client.client.fake
 
-import com.franklinharper.social.media.client.client.SocialPlatformClient
+import com.franklinharper.social.media.client.client.FollowingImportClient
 import com.franklinharper.social.media.client.client.PasswordAuthClient
+import com.franklinharper.social.media.client.client.SocialPlatformClient
 import com.franklinharper.social.media.client.domain.AccountSession
 import com.franklinharper.social.media.client.domain.ClientError
 import com.franklinharper.social.media.client.domain.ClientFailure
@@ -53,6 +54,7 @@ class FakeBlueskyClient(
     private val itemsByUser: Map<String, List<FeedItem>>,
     private val errorsByUser: Map<String, ClientError> = emptyMap(),
     private val sessionsByIdentifier: Map<String, AccountSession> = emptyMap(),
+    private val followedProfilesByAccount: Map<String, List<SocialProfile>> = emptyMap(),
     sessionStateProvider: suspend () -> SessionState = { SessionState.SignedOut },
 ) : FakeSocialPlatformClient(
     id = PlatformId.Bluesky,
@@ -66,10 +68,13 @@ class FakeBlueskyClient(
         }.sortedByDescending(FeedItem::publishedAtEpochMillis)
         FeedPage(items = items, nextCursor = null)
     },
-), PasswordAuthClient {
+), PasswordAuthClient, FollowingImportClient {
     override suspend fun signIn(identifier: String, password: String): AccountSession =
         sessionsByIdentifier[identifier]
             ?: throw FakeClientException(ClientError.AuthenticationError("invalid credentials"))
+
+    override suspend fun loadFollowedProfiles(accountId: String): List<SocialProfile> =
+        followedProfilesByAccount[accountId].orEmpty()
 }
 
 class FakeTwitterClient(

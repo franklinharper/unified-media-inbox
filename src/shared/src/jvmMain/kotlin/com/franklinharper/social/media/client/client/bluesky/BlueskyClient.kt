@@ -1,5 +1,6 @@
 package com.franklinharper.social.media.client.client.bluesky
 
+import com.franklinharper.social.media.client.client.FollowingImportClient
 import com.franklinharper.social.media.client.client.PasswordAuthClient
 import com.franklinharper.social.media.client.client.SocialPlatformClient
 import com.franklinharper.social.media.client.domain.AccountSession
@@ -49,7 +50,21 @@ class BlueskyClient(
             body = """{"identifier":${identifier.toJsonString()},"password":${password.toJsonString()}}""",
         )
     },
-) : SocialPlatformClient, PasswordAuthClient {
+    private val fetchFollows: suspend (String, String?) -> String = { actor, cursor ->
+        defaultFetcher(
+            url = buildString {
+                append("https://public.api.bsky.app/xrpc/app.bsky.graph.getFollows?actor=")
+                append(actor.urlEncode())
+                append("&limit=100")
+                if (cursor != null) {
+                    append("&cursor=")
+                    append(cursor.urlEncode())
+                }
+            },
+            authorization = null,
+        )
+    },
+) : SocialPlatformClient, PasswordAuthClient, FollowingImportClient {
     override val id: PlatformId = PlatformId.Bluesky
     override val displayName: String = "Bluesky"
 
@@ -75,6 +90,32 @@ class BlueskyClient(
         } catch (error: Throwable) {
             throw BlueskyClientException(ClientError.ParsingError(error.message))
         }
+    }
+
+    override suspend fun loadFollowedProfiles(accountId: String): List<SocialProfile> {
+        val profiles = mutableListOf<SocialProfile>()
+        var cursor: String? = null
+        do {
+            val payload = try {
+                fetchFollows(accountId, cursor)
+            } catch (error: Throwable) {
+                throw error.asBlueskyException(defaultMessage = "Unable to load followed accounts")
+            }
+            val response = try {
+                json.decodeFromString<GetFollowsResponse>(payload)
+            } catch (error: Throwable) {
+                throw BlueskyClientException(ClientError.ParsingError(error.message))
+            }
+            profiles += response.follows.map { profile ->
+                SocialProfile(
+                    accountId = profile.did,
+                    displayName = profile.displayName ?: profile.handle,
+                    handle = profile.handle,
+                )
+            }
+            cursor = response.cursor
+        } while (cursor != null)
+        return profiles
     }
 
     override suspend fun loadFeed(query: FeedQuery, cursor: FeedCursor?): FeedPage {
@@ -153,6 +194,19 @@ private data class CreateSessionResponse(
 @Serializable
 private data class GetAuthorFeedResponse(
     val feed: List<FeedEntry> = emptyList(),
+)
+
+@Serializable
+private data class GetFollowsResponse(
+    val follows: List<ActorProfileView> = emptyList(),
+    val cursor: String? = null,
+)
+
+@Serializable
+private data class ActorProfileView(
+    val did: String,
+    val handle: String,
+    val displayName: String? = null,
 )
 
 @Serializable

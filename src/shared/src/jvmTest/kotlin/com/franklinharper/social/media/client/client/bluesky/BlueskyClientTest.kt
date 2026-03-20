@@ -68,6 +68,27 @@ class BlueskyClientTest {
     }
 
     @Test
+    fun `loadFollowedProfiles paginates follow results`() = runBlocking {
+        val calls = mutableListOf<String?>()
+        val client = BlueskyClient(
+            fetchFollows = { actor, cursor ->
+                assertEquals("did:plc:abc", actor)
+                calls += cursor
+                if (cursor == null) {
+                    FOLLOWS_PAGE_ONE
+                } else {
+                    FOLLOWS_PAGE_TWO
+                }
+            },
+        )
+
+        val profiles = client.loadFollowedProfiles("did:plc:abc")
+
+        assertEquals(listOf(null, "cursor-1"), calls)
+        assertEquals(listOf("alice.bsky.social", "bob.bsky.social"), profiles.map { it.handle })
+    }
+
+    @Test
     fun `loadFeed converts request failures into client errors`() = runBlocking {
         val client = BlueskyClient(
             fetchAuthorFeed = { _, _ -> throw IllegalStateException("offline") },
@@ -117,6 +138,31 @@ class BlueskyClientTest {
               "handle": "frank.bsky.social",
               "accessJwt": "access-token",
               "refreshJwt": "refresh-token"
+            }
+        """
+
+        const val FOLLOWS_PAGE_ONE = """
+            {
+              "cursor": "cursor-1",
+              "follows": [
+                {
+                  "did": "did:plc:alice",
+                  "handle": "alice.bsky.social",
+                  "displayName": "Alice"
+                }
+              ]
+            }
+        """
+
+        const val FOLLOWS_PAGE_TWO = """
+            {
+              "follows": [
+                {
+                  "did": "did:plc:bob",
+                  "handle": "bob.bsky.social",
+                  "displayName": "Bob"
+                }
+              ]
             }
         """
     }

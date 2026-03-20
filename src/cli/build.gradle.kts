@@ -15,4 +15,5 @@ dependencies {
 
 application {
     mainClass = "com.franklinharper.social.media.client.cli.MainKt"
+    applicationDefaultJvmArgs = listOf("--enable-native-access=ALL-UNNAMED")
 }

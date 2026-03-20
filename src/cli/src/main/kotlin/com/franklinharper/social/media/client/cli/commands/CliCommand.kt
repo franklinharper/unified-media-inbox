@@ -9,6 +9,7 @@ sealed interface CliCommand {
         val urls: List<String>,
         val includeSeen: Boolean,
         val markSeen: Boolean,
+        val verbose: Boolean,
     ) : CliCommand
 
     data class SignIn(
@@ -16,6 +17,7 @@ sealed interface CliCommand {
         val identifier: String,
         val password: String,
     ) : CliCommand
+    data class ImportFollows(val platform: PlatformId) : CliCommand
     data class SignOut(val platform: PlatformId) : CliCommand
     data class AddUser(val platform: PlatformId, val user: String) : CliCommand
     data class RemoveUser(val platform: PlatformId, val user: String) : CliCommand
