@@ -264,6 +264,7 @@ class DefaultCliApp(
                     seenRepository.clearAll()
                     feedCacheRepository.clearAll()
                     sourceErrorRepository.clearAll()
+                    JvmDatabaseFactory.vacuum(databasePath)
                     CliResult.Success("Cleared persisted data")
                 } catch (error: Throwable) {
                     if (error.isSchemaMismatch() && databasePath.deleteIfExists()) {

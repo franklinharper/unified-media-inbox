@@ -326,6 +326,40 @@ class DefaultCliAppTest {
     }
 
     @Test
+    fun `clear-data vacuums reclaimed database pages`() = runBlocking {
+        val dbFile = File.createTempFile("social-cli-vacuum", ".db")
+        dbFile.deleteOnExit()
+        val source = FeedSource(PlatformId.Rss, "https://example.com/feed.xml", "Feed")
+        val app = DefaultCliApp(
+            databasePath = dbFile,
+            clientRegistry = ClientRegistry(
+                listOf(
+                    FakeRssClient(
+                        itemsByUrl = mapOf(
+                            source.sourceId to List(200) { index ->
+                                feedItem("item-$index", source, index.toLong()).copy(body = "x".repeat(8_000))
+                            },
+                        ),
+                    ),
+                    FakeBlueskyClient(itemsByUser = emptyMap()),
+                    FakeTwitterClient(itemsByUser = emptyMap()),
+                ),
+            ),
+        )
+
+        app.run(listOf("add-feed", source.sourceId))
+        app.run(listOf("list-new-items"))
+        val sizeBeforeClear = dbFile.length()
+
+        val result = app.run(listOf("clear-data"))
+
+        assertEquals(CliResult.Success("Cleared persisted data"), result)
+        assertEquals(0L, tableCount(dbFile, "feed_items"))
+        assertEquals(0L, tableCount(dbFile, "feed_sources"))
+        assertEquals(true, dbFile.length() < sizeBeforeClear)
+    }
+
+    @Test
     fun `list-sources reports signed in platform without configured sources`() = runBlocking {
         val dbFile = File.createTempFile("social-cli-test", ".db")
         dbFile.deleteOnExit()
@@ -609,6 +643,16 @@ class DefaultCliAppTest {
                 }
             }
         }
+
+        fun tableCount(databaseFile: File, tableName: String): Long =
+            DriverManager.getConnection("jdbc:sqlite:${databaseFile.absolutePath}").use { connection ->
+                connection.createStatement().use { statement ->
+                    statement.executeQuery("SELECT count(*) FROM $tableName").use { resultSet ->
+                        resultSet.next()
+                        resultSet.getLong(1)
+                    }
+                }
+            }
 
         const val RSS_XML = """
             <rss version="2.0">

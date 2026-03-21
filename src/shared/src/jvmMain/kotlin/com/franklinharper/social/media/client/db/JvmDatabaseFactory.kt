@@ -2,6 +2,7 @@ package com.franklinharper.social.media.client.db
 
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import java.io.File
+import java.sql.DriverManager
 import java.util.Properties
 
 object JvmDatabaseFactory {
@@ -23,5 +24,14 @@ object JvmDatabaseFactory {
             SocialMediaDatabase.Schema.create(driver)
         }
         return createSocialMediaDatabase(driver)
+    }
+
+    fun vacuum(databaseFile: File) {
+        if (!databaseFile.exists()) return
+        DriverManager.getConnection("jdbc:sqlite:${databaseFile.absolutePath}").use { connection ->
+            connection.createStatement().use { statement ->
+                statement.execute("VACUUM")
+            }
+        }
     }
 }
