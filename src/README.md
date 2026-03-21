@@ -74,6 +74,8 @@ Examples:
 ./social-cli add-feed https://hnrss.org/newest
 ./social-cli remove-feed https://hnrss.org/newest
 ./social-cli import-follows bluesky
+./social-cli import-opml ~/Downloads/feedly-export.opml
+./social-cli list-errors
 ```
 
 ### Build and Run Web Application

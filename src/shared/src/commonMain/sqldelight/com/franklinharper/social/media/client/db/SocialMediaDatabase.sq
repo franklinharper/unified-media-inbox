@@ -49,6 +49,17 @@ CREATE TABLE sync_state (
   FOREIGN KEY (source_platform_id, source_id) REFERENCES feed_sources(platform_id, source_id) ON DELETE CASCADE
 );
 
+CREATE TABLE source_errors (
+  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  source_platform_id TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  content_origin TEXT NOT NULL,
+  error_kind TEXT NOT NULL,
+  error_message TEXT,
+  occurred_at_epoch_millis INTEGER NOT NULL,
+  FOREIGN KEY (source_platform_id, source_id) REFERENCES feed_sources(platform_id, source_id) ON DELETE CASCADE
+);
+
 selectConfiguredSources:
 SELECT platform_id, source_kind, value
 FROM configured_sources
@@ -196,3 +207,50 @@ DELETE FROM feed_sources;
 
 removeAllSyncState:
 DELETE FROM sync_state;
+
+insertSourceError:
+INSERT INTO source_errors(
+  source_platform_id,
+  source_id,
+  content_origin,
+  error_kind,
+  error_message,
+  occurred_at_epoch_millis
+)
+VALUES (?, ?, ?, ?, ?, ?);
+
+selectAllSourceErrors:
+SELECT
+  se.id,
+  se.source_platform_id,
+  se.source_id,
+  fs.display_name,
+  se.content_origin,
+  se.error_kind,
+  se.error_message,
+  se.occurred_at_epoch_millis
+FROM source_errors se
+JOIN feed_sources fs
+  ON se.source_platform_id = fs.platform_id AND se.source_id = fs.source_id
+ORDER BY se.occurred_at_epoch_millis DESC, se.id DESC
+LIMIT ?;
+
+selectSourceErrorsForSource:
+SELECT
+  se.id,
+  se.source_platform_id,
+  se.source_id,
+  fs.display_name,
+  se.content_origin,
+  se.error_kind,
+  se.error_message,
+  se.occurred_at_epoch_millis
+FROM source_errors se
+JOIN feed_sources fs
+  ON se.source_platform_id = fs.platform_id AND se.source_id = fs.source_id
+WHERE se.source_platform_id = ? AND se.source_id = ?
+ORDER BY se.occurred_at_epoch_millis DESC, se.id DESC
+LIMIT ?;
+
+removeAllSourceErrors:
+DELETE FROM source_errors;

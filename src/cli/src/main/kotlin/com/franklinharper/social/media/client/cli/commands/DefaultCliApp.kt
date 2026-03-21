@@ -16,15 +16,18 @@ import com.franklinharper.social.media.client.domain.SocialProfile
 import com.franklinharper.social.media.client.domain.SessionState
 import com.franklinharper.social.media.client.domain.SourceContentOrigin
 import com.franklinharper.social.media.client.domain.SourceLoadState
+import com.franklinharper.social.media.client.domain.extractRssFeedUrlsFromOpml
 import com.franklinharper.social.media.client.repository.DefaultFeedRepository
 import com.franklinharper.social.media.client.repository.SqlDelightConfiguredSourceRepository
 import com.franklinharper.social.media.client.repository.SqlDelightFeedCacheRepository
 import com.franklinharper.social.media.client.repository.SqlDelightSeenItemRepository
+import com.franklinharper.social.media.client.repository.SqlDelightSourceErrorRepository
 import com.franklinharper.social.media.client.repository.SqlDelightSessionRepository
 import java.io.File
+import java.time.Instant
 
 class DefaultCliApp(
-    databasePath: File = File(System.getProperty("user.dir"), "social-media-client.db"),
+    private val databasePath: File = File(System.getProperty("user.dir"), "social-media-client.db"),
     clientRegistry: ClientRegistry? = null,
 ) : CliApp {
     private val database = JvmDatabaseFactory.fileBacked(databasePath)
@@ -32,6 +35,7 @@ class DefaultCliApp(
     private val seenRepository = SqlDelightSeenItemRepository(database) { System.currentTimeMillis() }
     private val sessionRepository = SqlDelightSessionRepository(database)
     private val feedCacheRepository = SqlDelightFeedCacheRepository(database) { System.currentTimeMillis() }
+    private val sourceErrorRepository = SqlDelightSourceErrorRepository(database)
     private val resolvedClientRegistry = clientRegistry ?: ClientRegistry(
         listOf(
             RssClient(),
@@ -50,6 +54,7 @@ class DefaultCliApp(
         clientRegistry = resolvedClientRegistry,
         seenItemRepository = seenRepository,
         feedCacheRepository = feedCacheRepository,
+        sourceErrorRepository = sourceErrorRepository,
         clock = { System.currentTimeMillis() },
     )
 
@@ -63,6 +68,21 @@ class DefaultCliApp(
             is CliCommand.RemoveFeed -> {
                 sourceRepository.removeSource(ConfiguredSource.RssFeed(url = command.url))
                 CliResult.Success("Removed RSS feed ${command.url}")
+            }
+            is CliCommand.ImportOpml -> {
+                val fileContent = try {
+                    File(command.filePath).readText()
+                } catch (error: Throwable) {
+                    return CliResult.Failure("Unable to read OPML file ${command.filePath}: ${error.message ?: "unknown error"}")
+                }
+                val urls = extractRssFeedUrlsFromOpml(fileContent)
+                if (urls.isEmpty()) {
+                    return CliResult.Failure("No RSS feeds found in OPML file ${command.filePath}")
+                }
+                urls.forEach { url ->
+                    sourceRepository.addSource(ConfiguredSource.RssFeed(url = url))
+                }
+                CliResult.Success("Imported ${urls.size} RSS feed(s) from ${command.filePath}")
             }
             is CliCommand.AddUser -> {
                 sourceRepository.addSource(
@@ -114,6 +134,33 @@ class DefaultCliApp(
                     }
                 }.joinToString("\n")
                 CliResult.Success(listOf(sessionsOutput, detailsOutput).filter { it.isNotBlank() }.joinToString("\n"))
+            }
+            CliCommand.ListErrors -> {
+                val errors = sourceErrorRepository.listErrors()
+                if (errors.isEmpty()) {
+                    CliResult.Success("No errors logged.")
+                } else {
+                    CliResult.Success(
+                        errors.joinToString("\n") { entry ->
+                            buildString {
+                                append("ERROR ")
+                                append(Instant.ofEpochMilli(entry.occurredAtEpochMillis))
+                                append(' ')
+                                append(entry.source.platformId.name.lowercase())
+                                append(' ')
+                                append(entry.source.sourceId)
+                                append(' ')
+                                append(entry.errorKind)
+                                append(' ')
+                                append(entry.contentOrigin.name.lowercase())
+                                entry.errorMessage?.takeIf(String::isNotBlank)?.let { message ->
+                                    append(' ')
+                                    append(message)
+                                }
+                            }
+                        },
+                    )
+                }
             }
             is CliCommand.ListNewItems -> {
                 val explicitSources = buildList {
@@ -203,11 +250,20 @@ class DefaultCliApp(
                 CliResult.Success("Signed out ${command.platform.name.lowercase()}")
             }
             CliCommand.ClearData -> {
-                sessionRepository.clearAll()
-                sourceRepository.clearAll()
-                seenRepository.clearAll()
-                feedCacheRepository.clearAll()
-                CliResult.Success("Cleared persisted data")
+                try {
+                    sessionRepository.clearAll()
+                    sourceRepository.clearAll()
+                    seenRepository.clearAll()
+                    feedCacheRepository.clearAll()
+                    sourceErrorRepository.clearAll()
+                    CliResult.Success("Cleared persisted data")
+                } catch (error: Throwable) {
+                    if (error.isSchemaMismatch() && databasePath.deleteIfExists()) {
+                        CliResult.Success("Cleared persisted data")
+                    } else {
+                        throw error
+                    }
+                }
             }
         }
     }
@@ -224,11 +280,15 @@ private val usageText =
       social-cli remove-user <bluesky|twitter> <handle>
       social-cli add-feed <feed-url>
       social-cli remove-feed <feed-url>
+      social-cli import-opml <opml-file>
       social-cli list-sources
+      social-cli list-errors
       social-cli clear-data
 
     Examples:
       social-cli add-feed https://hnrss.org/newest
+      social-cli import-opml ~/Downloads/feedly-export.opml
+      social-cli list-errors
       social-cli import-follows bluesky
       social-cli list-new-items --platform bluesky --user frank.bsky.social
       social-cli signin bluesky frank.bsky.social xxxx-xxxx-xxxx-xxxx
@@ -271,3 +331,14 @@ private fun formatSessionState(state: SessionState): String = when (state) {
     is SessionState.SignedIn -> "signed-in ${state.session.accountId}"
     is SessionState.Expired -> "expired${state.reason?.let { ": $it" }.orEmpty()}"
 }
+
+private fun Throwable.isSchemaMismatch(): Boolean =
+    generateSequence(this) { it.cause }
+        .mapNotNull(Throwable::message)
+        .any { message ->
+            message.contains("no such table", ignoreCase = true) ||
+                message.contains("has no column named", ignoreCase = true) ||
+                message.contains("table", ignoreCase = true) && message.contains("has no", ignoreCase = true)
+        }
+
+private fun File.deleteIfExists(): Boolean = !exists() || delete()

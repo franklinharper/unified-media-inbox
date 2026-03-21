@@ -23,6 +23,8 @@ sealed interface CliCommand {
     data class RemoveUser(val platform: PlatformId, val user: String) : CliCommand
     data class AddFeed(val url: String) : CliCommand
     data class RemoveFeed(val url: String) : CliCommand
+    data class ImportOpml(val filePath: String) : CliCommand
     data object ListSources : CliCommand
+    data object ListErrors : CliCommand
     data object ClearData : CliCommand
 }

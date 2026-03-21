@@ -16,6 +16,8 @@ import com.franklinharper.social.media.client.domain.SessionState
 import com.franklinharper.social.media.client.repository.SqlDelightSessionRepository
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import java.sql.DriverManager
+import kotlin.test.assertContains
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -196,6 +198,38 @@ class DefaultCliAppTest {
     }
 
     @Test
+    fun `import-opml adds rss feeds from file`() = runBlocking {
+        val dbFile = File.createTempFile("social-cli-test", ".db")
+        dbFile.deleteOnExit()
+        val opmlFile = File.createTempFile("social-cli-import", ".opml")
+        opmlFile.deleteOnExit()
+        opmlFile.writeText(
+            """
+            <opml version="1.0">
+              <body>
+                <outline text="Feeds">
+                  <outline text="HN" type="rss" xmlUrl="https://hnrss.org/newest"/>
+                  <outline text="Kotlin" type="rss" xmlUrl="https://example.com/feed.xml"/>
+                </outline>
+              </body>
+            </opml>
+            """.trimIndent(),
+        )
+        val app = DefaultCliApp(databasePath = dbFile)
+
+        val result = app.run(listOf("import-opml", opmlFile.absolutePath))
+        val listedSources = app.run(listOf("list-sources"))
+
+        assertEquals(
+            CliResult.Success("Imported 2 RSS feed(s) from ${opmlFile.absolutePath}"),
+            result,
+        )
+        assertIs<CliResult.Success>(listedSources)
+        assertEquals(true, listedSources.output.contains("SOURCE rss https://hnrss.org/newest"))
+        assertEquals(true, listedSources.output.contains("SOURCE rss https://example.com/feed.xml"))
+    }
+
+    @Test
     fun `list-sources reports when no sources are configured`() = runBlocking {
         val dbFile = File.createTempFile("social-cli-test", ".db")
         dbFile.deleteOnExit()
@@ -214,6 +248,81 @@ class DefaultCliAppTest {
             ),
             result,
         )
+    }
+
+    @Test
+    fun `import-opml fails when file has no rss feeds`() = runBlocking {
+        val dbFile = File.createTempFile("social-cli-test", ".db")
+        dbFile.deleteOnExit()
+        val opmlFile = File.createTempFile("social-cli-import-empty", ".opml")
+        opmlFile.deleteOnExit()
+        opmlFile.writeText(
+            """
+            <opml version="1.0">
+              <body>
+                <outline text="Empty"/>
+              </body>
+            </opml>
+            """.trimIndent(),
+        )
+        val app = DefaultCliApp(databasePath = dbFile)
+
+        val result = app.run(listOf("import-opml", opmlFile.absolutePath))
+
+        assertEquals(
+            CliResult.Failure("No RSS feeds found in OPML file ${opmlFile.absolutePath}"),
+            result,
+        )
+    }
+
+    @Test
+    fun `list-errors shows persisted feed refresh failures`() = runBlocking {
+        val dbFile = File.createTempFile("social-cli-test", ".db")
+        dbFile.deleteOnExit()
+        val app = DefaultCliApp(
+            databasePath = dbFile,
+            clientRegistry = ClientRegistry(
+                listOf(
+                    FakeRssClient(
+                        itemsByUrl = emptyMap(),
+                        errorsByUrl = mapOf("https://example.com/feed.xml" to ClientError.ParsingError("bad xml")),
+                    ),
+                    FakeBlueskyClient(itemsByUser = emptyMap()),
+                    FakeTwitterClient(itemsByUser = emptyMap()),
+                ),
+            ),
+        )
+
+        app.run(listOf("add-feed", "https://example.com/feed.xml"))
+        app.run(listOf("list-new-items"))
+        val result = app.run(listOf("list-errors"))
+
+        assertIs<CliResult.Success>(result)
+        assertContains(result.output, "ERROR ")
+        assertContains(result.output, "rss https://example.com/feed.xml parsing none bad xml")
+    }
+
+    @Test
+    fun `list-errors reports when no errors are logged`() = runBlocking {
+        val dbFile = File.createTempFile("social-cli-test", ".db")
+        dbFile.deleteOnExit()
+        val app = DefaultCliApp(databasePath = dbFile)
+
+        val result = app.run(listOf("list-errors"))
+
+        assertEquals(CliResult.Success("No errors logged."), result)
+    }
+
+    @Test
+    fun `clear-data deletes database file when schema is outdated`() = runBlocking {
+        val dbFile = File.createTempFile("social-cli-legacy", ".db")
+        createLegacyCliSchema(dbFile)
+        val app = DefaultCliApp(databasePath = dbFile)
+
+        val result = app.run(listOf("clear-data"))
+
+        assertEquals(CliResult.Success("Cleared persisted data"), result)
+        assertEquals(false, dbFile.exists())
     }
 
     @Test
@@ -427,6 +536,80 @@ class DefaultCliAppTest {
     )
 
     private companion object {
+        fun createLegacyCliSchema(databaseFile: File) {
+            DriverManager.getConnection("jdbc:sqlite:${databaseFile.absolutePath}").use { connection ->
+                connection.createStatement().use { statement ->
+                    statement.executeUpdate(
+                        """
+                        CREATE TABLE configured_sources (
+                          platform_id TEXT NOT NULL,
+                          source_kind TEXT NOT NULL,
+                          value TEXT NOT NULL,
+                          PRIMARY KEY (platform_id, source_kind, value)
+                        )
+                        """.trimIndent(),
+                    )
+                    statement.executeUpdate(
+                        """
+                        CREATE TABLE seen_items (
+                          item_key TEXT NOT NULL PRIMARY KEY,
+                          seen_at_epoch_millis INTEGER NOT NULL
+                        )
+                        """.trimIndent(),
+                    )
+                    statement.executeUpdate(
+                        """
+                        CREATE TABLE account_sessions (
+                          platform_id TEXT NOT NULL PRIMARY KEY,
+                          account_id TEXT NOT NULL,
+                          access_token TEXT,
+                          refresh_token TEXT,
+                          expires_at_epoch_millis INTEGER
+                        )
+                        """.trimIndent(),
+                    )
+                    statement.executeUpdate(
+                        """
+                        CREATE TABLE feed_sources (
+                          platform_id TEXT NOT NULL,
+                          source_id TEXT NOT NULL,
+                          display_name TEXT NOT NULL,
+                          PRIMARY KEY (platform_id, source_id)
+                        )
+                        """.trimIndent(),
+                    )
+                    statement.executeUpdate(
+                        """
+                        CREATE TABLE feed_items (
+                          item_key TEXT NOT NULL PRIMARY KEY,
+                          item_id TEXT NOT NULL,
+                          platform_id TEXT NOT NULL,
+                          source_platform_id TEXT NOT NULL,
+                          source_id TEXT NOT NULL,
+                          author_name TEXT,
+                          title TEXT,
+                          body TEXT,
+                          permalink TEXT,
+                          published_at_epoch_millis INTEGER NOT NULL,
+                          cached_at_epoch_millis INTEGER NOT NULL
+                        )
+                        """.trimIndent(),
+                    )
+                    statement.executeUpdate(
+                        """
+                        CREATE TABLE sync_state (
+                          source_platform_id TEXT NOT NULL,
+                          source_id TEXT NOT NULL,
+                          next_cursor_value TEXT,
+                          last_refreshed_at_epoch_millis INTEGER,
+                          PRIMARY KEY (source_platform_id, source_id)
+                        )
+                        """.trimIndent(),
+                    )
+                }
+            }
+        }
+
         const val RSS_XML = """
             <rss version="2.0">
               <channel>

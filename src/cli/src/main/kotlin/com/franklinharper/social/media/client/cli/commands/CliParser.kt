@@ -14,7 +14,9 @@ fun parseCommand(args: List<String>): CliCommand? {
         "remove-user" -> parseUserCommand(rest) { platform, user -> CliCommand.RemoveUser(platform, user) }
         "add-feed" -> parsePositionalUrlCommand(rest) { url -> CliCommand.AddFeed(url) }
         "remove-feed" -> parsePositionalUrlCommand(rest) { url -> CliCommand.RemoveFeed(url) }
+        "import-opml" -> parsePositionalFileCommand(rest) { filePath -> CliCommand.ImportOpml(filePath) }
         "list-sources" -> CliCommand.ListSources
+        "list-errors" -> CliCommand.ListErrors
         "clear-data" -> CliCommand.ClearData
         else -> null
     }
@@ -79,6 +81,14 @@ private fun parseUserCommand(
 }
 
 private fun parsePositionalUrlCommand(
+    args: List<String>,
+    factory: (String) -> CliCommand,
+): CliCommand? {
+    if (args.size != 1) return null
+    return factory(args[0])
+}
+
+private fun parsePositionalFileCommand(
     args: List<String>,
     factory: (String) -> CliCommand,
 ): CliCommand? {

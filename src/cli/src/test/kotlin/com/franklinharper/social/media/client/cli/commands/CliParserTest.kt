@@ -74,6 +74,19 @@ class CliParserTest {
     }
 
     @Test
+    fun `parses import-opml with positional file path`() {
+        assertEquals(
+            CliCommand.ImportOpml("/tmp/feedly.opml"),
+            parseCommand(listOf("import-opml", "/tmp/feedly.opml")),
+        )
+    }
+
+    @Test
+    fun `parses list-errors`() {
+        assertEquals(CliCommand.ListErrors, parseCommand(listOf("list-errors")))
+    }
+
+    @Test
     fun `parses bluesky signin credentials`() {
         assertEquals(
             CliCommand.SignIn(

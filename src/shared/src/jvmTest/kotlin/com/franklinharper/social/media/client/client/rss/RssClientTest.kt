@@ -3,8 +3,12 @@ package com.franklinharper.social.media.client.client.rss
 import com.franklinharper.social.media.client.domain.FeedQuery
 import com.franklinharper.social.media.client.domain.PlatformId
 import kotlinx.coroutines.runBlocking
+import java.io.ByteArrayOutputStream
+import java.io.PrintStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class RssClientTest {
 
@@ -34,6 +38,26 @@ class RssClientTest {
         assertEquals("Atom Feed", page.items.single().source.displayName)
         assertEquals("tag:example.com,2026:1", page.items.single().itemId)
         assertEquals("https://example.com/posts/1", page.items.single().permalink)
+    }
+
+    @Test
+    fun `malformed xml does not emit parser fatal errors to stderr`() = runBlocking {
+        val client = RssClient(fetcher = { MALFORMED_XML })
+        val originalErr = System.err
+        val errBuffer = ByteArrayOutputStream()
+        System.setErr(PrintStream(errBuffer))
+
+        try {
+            assertFailsWith<RssClientException> {
+                client.loadFeed(
+                    FeedQuery.RssFeeds(urls = listOf("https://example.com/bad.xml")),
+                )
+            }
+        } finally {
+            System.setErr(originalErr)
+        }
+
+        assertTrue(errBuffer.toString().isBlank())
     }
 
     private companion object {
@@ -73,6 +97,16 @@ class RssClientTest {
                 </author>
               </entry>
             </feed>
+        """
+
+        const val MALFORMED_XML = """
+             
+            <?xml version="1.0" encoding="UTF-8"?>
+            <rss version="2.0">
+              <channel>
+                <title>Broken Feed</title>
+              </channel>
+            </rss>
         """
     }
 }

@@ -16,6 +16,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.w3c.dom.Element
 import org.xml.sax.InputSource
+import org.xml.sax.SAXParseException
+import org.xml.sax.helpers.DefaultHandler
 import java.io.StringReader
 import java.net.URI
 import java.net.http.HttpClient
@@ -59,7 +61,10 @@ class RssClient(
     }
 
     internal fun parseFeed(xml: String, sourceUrl: String): List<FeedItem> {
-        val document = documentBuilderFactory().newDocumentBuilder()
+        val builder = documentBuilderFactory().newDocumentBuilder().apply {
+            setErrorHandler(QuietXmlErrorHandler)
+        }
+        val document = builder
             .parse(InputSource(StringReader(xml)))
         document.documentElement.normalize()
         val root = document.documentElement
@@ -139,6 +144,18 @@ class RssClient(
         }
 
     private companion object {
+        val QuietXmlErrorHandler = object : DefaultHandler() {
+            override fun warning(exception: SAXParseException) = Unit
+
+            override fun error(exception: SAXParseException) {
+                throw exception
+            }
+
+            override fun fatalError(exception: SAXParseException) {
+                throw exception
+            }
+        }
+
         private val httpClient: HttpClient = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.NORMAL)
             .build()

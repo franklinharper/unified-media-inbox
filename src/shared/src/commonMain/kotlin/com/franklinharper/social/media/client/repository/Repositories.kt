@@ -8,6 +8,8 @@ import com.franklinharper.social.media.client.domain.FeedSource
 import com.franklinharper.social.media.client.domain.FeedSyncState
 import com.franklinharper.social.media.client.domain.PlatformId
 import com.franklinharper.social.media.client.domain.SessionState
+import com.franklinharper.social.media.client.domain.SourceErrorLogEntry
+import com.franklinharper.social.media.client.domain.SourceContentOrigin
 
 interface FeedRepository {
     suspend fun loadFeedItems(request: FeedRequest): FeedLoadResult
@@ -43,5 +45,17 @@ interface FeedCacheRepository {
         refreshedAtEpochMillis: Long? = null,
     )
     suspend fun getSyncState(source: FeedSource): FeedSyncState?
+    suspend fun clearAll()
+}
+
+interface SourceErrorRepository {
+    suspend fun logError(
+        source: FeedSource,
+        contentOrigin: SourceContentOrigin,
+        errorKind: String,
+        errorMessage: String?,
+        occurredAtEpochMillis: Long,
+    )
+    suspend fun listErrors(source: FeedSource? = null, limit: Long = 100): List<SourceErrorLogEntry>
     suspend fun clearAll()
 }

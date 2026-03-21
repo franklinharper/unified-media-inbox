@@ -1,6 +1,8 @@
 package com.franklinharper.social.media.client.repository
 
 import com.franklinharper.social.media.client.db.SocialMediaDatabase
+import com.franklinharper.social.media.client.db.SelectAllSourceErrors
+import com.franklinharper.social.media.client.db.SelectSourceErrorsForSource
 import com.franklinharper.social.media.client.domain.AccountSession
 import com.franklinharper.social.media.client.domain.ConfiguredSource
 import com.franklinharper.social.media.client.domain.FeedCursor
@@ -10,6 +12,8 @@ import com.franklinharper.social.media.client.domain.FeedSyncState
 import com.franklinharper.social.media.client.domain.PlatformId
 import com.franklinharper.social.media.client.domain.SeenState
 import com.franklinharper.social.media.client.domain.SessionState
+import com.franklinharper.social.media.client.domain.SourceContentOrigin
+import com.franklinharper.social.media.client.domain.SourceErrorLogEntry
 
 class SqlDelightConfiguredSourceRepository(
     private val database: SocialMediaDatabase,
@@ -180,6 +184,49 @@ class SqlDelightFeedCacheRepository(
     }
 }
 
+class SqlDelightSourceErrorRepository(
+    private val database: SocialMediaDatabase,
+) : SourceErrorRepository {
+    private val queries = database.socialMediaDatabaseQueries
+
+    override suspend fun logError(
+        source: FeedSource,
+        contentOrigin: SourceContentOrigin,
+        errorKind: String,
+        errorMessage: String?,
+        occurredAtEpochMillis: Long,
+    ) {
+        queries.upsertFeedSource(
+            platform_id = source.platformId.serializedName,
+            source_id = source.sourceId,
+            display_name = source.displayName,
+        )
+        queries.insertSourceError(
+            source_platform_id = source.platformId.serializedName,
+            source_id = source.sourceId,
+            content_origin = contentOrigin.serializedName,
+            error_kind = errorKind,
+            error_message = errorMessage,
+            occurred_at_epoch_millis = occurredAtEpochMillis,
+        )
+    }
+
+    override suspend fun listErrors(source: FeedSource?, limit: Long): List<SourceErrorLogEntry> =
+        if (source == null) {
+            queries.selectAllSourceErrors(limit).executeAsList().map(SelectAllSourceErrors::toDomain)
+        } else {
+            queries.selectSourceErrorsForSource(
+                source_platform_id = source.platformId.serializedName,
+                source_id = source.sourceId,
+                value_ = limit,
+            ).executeAsList().map(SelectSourceErrorsForSource::toDomain)
+        }
+
+    override suspend fun clearAll() {
+        queries.removeAllSourceErrors()
+    }
+}
+
 private fun toConfiguredSource(
     platform_id: String,
     source_kind: String,
@@ -251,6 +298,50 @@ private fun toFeedSyncState(
     lastRefreshedAtEpochMillis = last_refreshed_at_epoch_millis,
 )
 
+private fun toSourceErrorLogEntry(
+    id: Long,
+    source_platform_id: String,
+    source_id: String,
+    display_name: String,
+    content_origin: String,
+    error_kind: String,
+    error_message: String?,
+    occurred_at_epoch_millis: Long,
+): SourceErrorLogEntry = SourceErrorLogEntry(
+    id = id,
+    source = FeedSource(
+        platformId = PlatformId.fromSerializedName(source_platform_id),
+        sourceId = source_id,
+        displayName = display_name,
+    ),
+    contentOrigin = sourceContentOriginFromSerializedName(content_origin),
+    errorKind = error_kind,
+    errorMessage = error_message,
+    occurredAtEpochMillis = occurred_at_epoch_millis,
+)
+
+private fun SelectAllSourceErrors.toDomain(): SourceErrorLogEntry = toSourceErrorLogEntry(
+    id = id,
+    source_platform_id = source_platform_id,
+    source_id = source_id,
+    display_name = display_name,
+    content_origin = content_origin,
+    error_kind = error_kind,
+    error_message = error_message,
+    occurred_at_epoch_millis = occurred_at_epoch_millis,
+)
+
+private fun SelectSourceErrorsForSource.toDomain(): SourceErrorLogEntry = toSourceErrorLogEntry(
+    id = id,
+    source_platform_id = source_platform_id,
+    source_id = source_id,
+    display_name = display_name,
+    content_origin = content_origin,
+    error_kind = error_kind,
+    error_message = error_message,
+    occurred_at_epoch_millis = occurred_at_epoch_millis,
+)
+
 private val ConfiguredSource.kind: String
     get() = when (this) {
         is ConfiguredSource.RssFeed -> "rss_feed"
@@ -274,4 +365,14 @@ private fun PlatformId.Companion.fromSerializedName(value: String): PlatformId =
     "bluesky" -> PlatformId.Bluesky
     "twitter" -> PlatformId.Twitter
     else -> error("Unsupported platform id: $value")
+}
+
+private val SourceContentOrigin.serializedName: String
+    get() = name.lowercase()
+
+private fun sourceContentOriginFromSerializedName(value: String): SourceContentOrigin = when (value) {
+    "refresh" -> SourceContentOrigin.Refresh
+    "cache" -> SourceContentOrigin.Cache
+    "none" -> SourceContentOrigin.None
+    else -> error("Unsupported source content origin: $value")
 }

@@ -11,6 +11,7 @@ import com.franklinharper.social.media.client.domain.FeedSource
 import com.franklinharper.social.media.client.domain.PlatformId
 import com.franklinharper.social.media.client.domain.SeenState
 import com.franklinharper.social.media.client.domain.SourceContentOrigin
+import com.franklinharper.social.media.client.domain.SourceErrorLogEntry
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -110,6 +111,7 @@ class DefaultFeedRepositoryTest {
         runBlocking {
             val goodSource = FeedSource(PlatformId.Rss, "https://example.com/good.xml", "good")
             val badSourceUrl = "https://example.com/bad.xml"
+            val sourceErrorRepository = InMemorySourceErrorRepository()
             val repository = DefaultFeedRepository(
                 clientRegistry = ClientRegistry(
                     listOf(
@@ -125,6 +127,8 @@ class DefaultFeedRepositoryTest {
                 ),
                 seenItemRepository = InMemorySeenItemRepository(),
                 feedCacheRepository = InMemoryFeedCacheRepository(),
+                sourceErrorRepository = sourceErrorRepository,
+                clock = { 123L },
             )
 
             val result = repository.loadFeedItems(
@@ -140,6 +144,10 @@ class DefaultFeedRepositoryTest {
             val errorStatus = result.sourceStatuses.single { it.source.sourceId == badSourceUrl }
             assertIs<com.franklinharper.social.media.client.domain.SourceLoadState.Error>(errorStatus.state)
             assertEquals(SourceContentOrigin.None, errorStatus.contentOrigin)
+            assertEquals(1, sourceErrorRepository.entries.size)
+            assertEquals("network", sourceErrorRepository.entries.single().errorKind)
+            assertEquals("offline", sourceErrorRepository.entries.single().errorMessage)
+            assertEquals(123L, sourceErrorRepository.entries.single().occurredAtEpochMillis)
         }
     }
 
@@ -272,6 +280,37 @@ private class InMemoryFeedCacheRepository : FeedCacheRepository {
     override suspend fun clearAll() {
         itemsBySource.clear()
         syncStateBySource.clear()
+    }
+}
+
+private class InMemorySourceErrorRepository : SourceErrorRepository {
+    val entries = mutableListOf<SourceErrorLogEntry>()
+
+    override suspend fun logError(
+        source: FeedSource,
+        contentOrigin: SourceContentOrigin,
+        errorKind: String,
+        errorMessage: String?,
+        occurredAtEpochMillis: Long,
+    ) {
+        entries += SourceErrorLogEntry(
+            id = entries.size.toLong() + 1L,
+            source = source,
+            contentOrigin = contentOrigin,
+            errorKind = errorKind,
+            errorMessage = errorMessage,
+            occurredAtEpochMillis = occurredAtEpochMillis,
+        )
+    }
+
+    override suspend fun listErrors(source: FeedSource?, limit: Long): List<SourceErrorLogEntry> =
+        entries
+            .asReversed()
+            .filter { entry -> source == null || entry.source == source }
+            .take(limit.toInt())
+
+    override suspend fun clearAll() {
+        entries.clear()
     }
 }
 

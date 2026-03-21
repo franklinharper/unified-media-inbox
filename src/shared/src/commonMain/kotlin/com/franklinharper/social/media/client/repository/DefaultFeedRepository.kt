@@ -22,6 +22,7 @@ class DefaultFeedRepository(
     private val clientRegistry: ClientRegistry,
     private val seenItemRepository: SeenItemRepository,
     private val feedCacheRepository: FeedCacheRepository? = null,
+    private val sourceErrorRepository: SourceErrorRepository? = null,
     private val clock: () -> Long = { 0L },
 ) : FeedRepository {
     override suspend fun loadFeedItems(request: FeedRequest): FeedLoadResult = coroutineScope {
@@ -69,12 +70,21 @@ class DefaultFeedRepository(
             )
         } catch (error: Throwable) {
             val filteredCachedItems = cachedItems.filteredBySeen(includeSeen, seenItemRepository)
+            val contentOrigin = if (filteredCachedItems.isEmpty()) SourceContentOrigin.None else SourceContentOrigin.Cache
+            val clientError = error.toClientError()
+            sourceErrorRepository?.logError(
+                source = feedSource,
+                contentOrigin = contentOrigin,
+                errorKind = clientError.kind,
+                errorMessage = clientError.messageOrNull,
+                occurredAtEpochMillis = clock(),
+            )
             SourceLoadResult(
                 items = filteredCachedItems,
                 status = FeedSourceStatus(
                     source = feedSource,
-                    state = SourceLoadState.Error(error.toClientError()),
-                    contentOrigin = if (filteredCachedItems.isEmpty()) SourceContentOrigin.None else SourceContentOrigin.Cache,
+                    state = SourceLoadState.Error(clientError),
+                    contentOrigin = contentOrigin,
                 ),
             )
         }
@@ -108,6 +118,26 @@ private fun Throwable.toClientError(): ClientError = when (this) {
     is ClientFailure -> clientError
     else -> ClientError.TemporaryFailure(message)
 }
+
+private val ClientError.kind: String
+    get() = when (this) {
+        is ClientError.NetworkError -> "network"
+        is ClientError.AuthenticationError -> "authentication"
+        is ClientError.RateLimitError -> "rate_limit"
+        is ClientError.ParsingError -> "parsing"
+        is ClientError.TemporaryFailure -> "temporary"
+        is ClientError.PermanentFailure -> "permanent"
+    }
+
+private val ClientError.messageOrNull: String?
+    get() = when (this) {
+        is ClientError.NetworkError -> message
+        is ClientError.AuthenticationError -> message
+        is ClientError.RateLimitError -> retryAfterMillis?.toString()
+        is ClientError.ParsingError -> message
+        is ClientError.TemporaryFailure -> message
+        is ClientError.PermanentFailure -> message
+    }
 
 private val FeedItem.cacheKey: String
     get() = "${platformId.name.lowercase()}:$itemId"

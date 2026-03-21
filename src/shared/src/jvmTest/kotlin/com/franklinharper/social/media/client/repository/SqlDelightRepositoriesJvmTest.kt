@@ -8,6 +8,7 @@ import com.franklinharper.social.media.client.domain.FeedItem
 import com.franklinharper.social.media.client.domain.FeedSource
 import com.franklinharper.social.media.client.domain.PlatformId
 import com.franklinharper.social.media.client.domain.SeenState
+import com.franklinharper.social.media.client.domain.SourceContentOrigin
 import com.franklinharper.social.media.client.domain.SessionState
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -127,6 +128,38 @@ class SqlDelightRepositoriesJvmTest {
 
             assertEquals(emptyList(), repository.readItems(source, includeSeen = true))
             assertNull(repository.getSyncState(source))
+        }
+    }
+
+    @Test
+    fun `source error repository stores and clears errors`() = withDatabase { database ->
+        runBlocking {
+            val repository = SqlDelightSourceErrorRepository(database)
+            val source = FeedSource(
+                platformId = PlatformId.Rss,
+                sourceId = "https://example.com/feed.xml",
+                displayName = "Example Feed",
+            )
+
+            repository.logError(
+                source = source,
+                contentOrigin = SourceContentOrigin.None,
+                errorKind = "parsing",
+                errorMessage = "invalid xml",
+                occurredAtEpochMillis = 123L,
+            )
+
+            val errors = repository.listErrors(source)
+            assertEquals(1, errors.size)
+            assertEquals(source, errors.single().source)
+            assertEquals(SourceContentOrigin.None, errors.single().contentOrigin)
+            assertEquals("parsing", errors.single().errorKind)
+            assertEquals("invalid xml", errors.single().errorMessage)
+            assertEquals(123L, errors.single().occurredAtEpochMillis)
+
+            repository.clearAll()
+
+            assertEquals(emptyList(), repository.listErrors())
         }
     }
 

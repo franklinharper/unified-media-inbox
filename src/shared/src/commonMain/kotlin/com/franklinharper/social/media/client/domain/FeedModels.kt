@@ -116,6 +116,15 @@ data class FeedSyncState(
     val lastRefreshedAtEpochMillis: Long? = null,
 )
 
+data class SourceErrorLogEntry(
+    val id: Long,
+    val source: FeedSource,
+    val contentOrigin: SourceContentOrigin,
+    val errorKind: String,
+    val errorMessage: String?,
+    val occurredAtEpochMillis: Long,
+)
+
 sealed interface SourceLoadState {
     data object Loading : SourceLoadState
     data object Success : SourceLoadState
