@@ -12,18 +12,9 @@ The existing code is still template-level scaffolding, so this is a good point t
 
 ## Delivery Strategy
 
-Before implementing a GUI, the first executable surface should be a command line interface that directly exercises platform implementations.
+The project uses a CLI-first delivery strategy.
 
-This CLI-first approach will:
-
-- validate client integrations earlier
-- keep the shared abstraction practical
-- make client testing easier than starting with a GUI
-- support incremental development of RSS and social platform readers
-
-For the time being, the application scope should remain read-only.
-
-The CLI is primarily a testing tool. Its persisted data should live in the current working directory so different directories can hold different test configurations.
+See [ADR 0001](./docs/adr/0001-cli-first-delivery.md) and [ADR 0003](./docs/adr/0003-cli-cwd-persistence.md).
 
 ## Goals
 
@@ -42,15 +33,9 @@ The CLI is primarily a testing tool. Its persisted data should live in the curre
 
 ### 1. Put the core abstraction in `shared`
 
-The `shared` module should contain:
+The `shared` module is the core application boundary.
 
-- shared domain models
-- client interfaces
-- repositories for app-level orchestration
-- seen-item tracking abstractions
-- platform client implementations that can run in common code where practical
-
-This module should become the core of the application.
+See [ADR 0002](./docs/adr/0002-shared-core-boundary.md).
 
 ### 2. Add a dedicated CLI module
 
@@ -70,7 +55,7 @@ The CLI should depend on `shared` and provide commands for:
 - adding and removing users and RSS feeds
 - clearing persisted data
 
-For testing convenience, CLI persistence should live in the current directory rather than using a shared global application data location. It should otherwise stay as close as possible to the persistence model used by the GUI.
+For CLI persistence location, see [ADR 0003](./docs/adr/0003-cli-cwd-persistence.md).
 
 ### 3. Keep `composeApp` for later GUI work
 
@@ -408,6 +393,8 @@ Responsibilities:
 
 This is the main application boundary for the first version. It keeps the architecture simpler than introducing a separate use-case layer immediately.
 
+The shared application boundary decision is documented in [ADR 0002](./docs/adr/0002-shared-core-boundary.md).
+
 The repository contract should make partial failure explicit by returning a result that includes:
 
 - merged `FeedItem` values
@@ -462,6 +449,8 @@ For scroll-driven seen marking, the GUI should dispatch `MarkSeen` only after an
 
 For the first version, a simple local file-backed store in the CLI module is enough. The abstraction should still live in `shared` so the GUI can reuse it later.
 For the CLI specifically, persistence should use the same storage abstractions and schema as the GUI where practical, but store its files and database in the current working directory so separate directories can represent separate test environments.
+
+See [ADR 0003](./docs/adr/0003-cli-cwd-persistence.md).
 
 ### Why repositories first
 
@@ -716,14 +705,9 @@ The cache should be keyed by stable shared identifiers such as `platformId:itemI
 
 ### Recommended database approach
 
-For Kotlin Multiplatform, `SQLDelight` is the strongest default choice because it provides:
+Use SQLDelight as the local database approach.
 
-- multiplatform support
-- typed schema and queries
-- good fit for shared business logic
-- reuse across CLI and future GUI targets
-
-For the CLI, the same database approach should be used where practical, but the database files should be located in the current working directory to support isolated test setups.
+See [ADR 0004](./docs/adr/0004-use-sqldelight.md) and [ADR 0003](./docs/adr/0003-cli-cwd-persistence.md).
 
 Recommended SQLDelight drivers:
 
@@ -833,6 +817,8 @@ This should include:
 ### Remaining technical decisions
 
 Persisted sign-in secrets will not receive extra protection beyond normal persistence in the first version.
+
+Twitter/X support is documented in [ADR 0005](./docs/adr/0005-official-x-api-v2.md).
 
 ## GUI and ViewModel Communication Model
 
@@ -975,7 +961,9 @@ Bluesky is a good next client because it supports richer social features and is 
 
 ### Phase 8: Add Twitter or X
 
-Twitter or X should come later because authentication, API access, and feature constraints are usually more complex.
+Twitter or X should come later because authentication, API access, pricing, and feature constraints are usually more complex.
+
+See [ADR 0005](./docs/adr/0005-official-x-api-v2.md).
 
 ### Phase 9: Add persistence and caching
 
