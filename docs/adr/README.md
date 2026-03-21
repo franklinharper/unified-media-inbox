@@ -12,3 +12,4 @@ Implementation sequencing and task planning belong in [implementation-plan.md](/
 - [ADR 0004: Use SQLDelight For Local Application Storage](./0004-use-sqldelight.md)
 - [ADR 0005: Use Official X API v2 Only For Twitter/X Support](./0005-official-x-api-v2.md)
 - [ADR 0006: Use Ktor For Cross-Platform Client Networking](./0006-use-ktor-for-cross-platform-client-networking.md)
+- [ADR 0007: Use Ktor CIO As The Shared Client Engine](./0007-use-ktor-cio-as-the-shared-client-engine.md)
