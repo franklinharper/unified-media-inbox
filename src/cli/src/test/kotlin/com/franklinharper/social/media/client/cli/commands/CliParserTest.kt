@@ -53,10 +53,10 @@ class CliParserTest {
     }
 
     @Test
-    fun `parses add-user`() {
+    fun `parses add-follow`() {
         assertEquals(
             CliCommand.AddUser(PlatformId.Twitter, "frank"),
-            parseCommand(listOf("add-user", "twitter", "frank")),
+            parseCommand(listOf("add-follow", "twitter", "frank")),
         )
     }
 

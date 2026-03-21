@@ -179,7 +179,7 @@ class DefaultCliApp(
                 }
                 val sources = if (explicitSources.isEmpty()) sourceRepository.listSources() else explicitSources
                 if (sources.isEmpty()) {
-                    return CliResult.Failure("No sources configured. Use add-feed or add-user, or pass --url/--user.")
+                    return CliResult.Failure("No sources configured. Use add-feed or add-follow, or pass --url/--user.")
                 }
                 val result = feedRepository.loadFeedItems(
                     FeedRequest(
@@ -285,8 +285,8 @@ private val usageText =
       social-cli signin bluesky <handle> <app-password>
       social-cli import-follows bluesky
       social-cli signout <bluesky|twitter>
-      social-cli add-user <bluesky|twitter> <handle>
-      social-cli remove-user <bluesky|twitter> <handle>
+      social-cli add-follow <bluesky|twitter> <handle>
+      social-cli remove-follow <bluesky|twitter> <handle>
       social-cli add-feed <feed-url>
       social-cli remove-feed <feed-url>
       social-cli import-opml <opml-file>

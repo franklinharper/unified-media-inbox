@@ -10,8 +10,8 @@ fun parseCommand(args: List<String>): CliCommand? {
         "signin" -> parseSignIn(rest)
         "import-follows" -> parseImportFollows(rest)
         "signout" -> parsePositionalPlatformCommand(rest) { platform -> CliCommand.SignOut(platform) }
-        "add-user" -> parseUserCommand(rest) { platform, user -> CliCommand.AddUser(platform, user) }
-        "remove-user" -> parseUserCommand(rest) { platform, user -> CliCommand.RemoveUser(platform, user) }
+        "add-follow" -> parseUserCommand(rest) { platform, user -> CliCommand.AddUser(platform, user) }
+        "remove-follow" -> parseUserCommand(rest) { platform, user -> CliCommand.RemoveUser(platform, user) }
         "add-feed" -> parsePositionalUrlCommand(rest) { url -> CliCommand.AddFeed(url) }
         "remove-feed" -> parsePositionalUrlCommand(rest) { url -> CliCommand.RemoveFeed(url) }
         "import-opml" -> parsePositionalFileCommand(rest) { filePath -> CliCommand.ImportOpml(filePath) }

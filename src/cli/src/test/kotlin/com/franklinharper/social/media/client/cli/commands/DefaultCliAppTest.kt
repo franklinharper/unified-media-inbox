@@ -148,7 +148,7 @@ class DefaultCliAppTest {
         val result = app.run(listOf("list-new-items"))
 
         assertEquals(
-            CliResult.Failure("No sources configured. Use add-feed or add-user, or pass --url/--user."),
+            CliResult.Failure("No sources configured. Use add-feed or add-follow, or pass --url/--user."),
             result,
         )
     }
@@ -179,7 +179,7 @@ class DefaultCliAppTest {
         )
 
         app.run(listOf("add-feed", "https://example.com/feed.xml"))
-        app.run(listOf("add-user", "bluesky", "frank.bsky.social"))
+        app.run(listOf("add-follow", "bluesky", "frank.bsky.social"))
 
         val result = app.run(listOf("list-sources"))
 
