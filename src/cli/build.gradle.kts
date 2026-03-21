@@ -10,6 +10,7 @@ kotlin {
 dependencies {
     implementation(projects.shared)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.logback)
     testImplementation(libs.kotlin.test)
 }
 
