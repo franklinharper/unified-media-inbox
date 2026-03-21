@@ -1,5 +1,7 @@
 This is a Kotlin Multiplatform project targeting Android, iOS, Web, Desktop (JVM), Server.
 
+Run Gradle from the `src/` directory with the repo-local wrapper using relative commands such as `./gradlew :shared:jvmTest`. Avoid absolute wrapper paths.
+
 * [/composeApp](./composeApp/src) is for code that will be shared across your Compose Multiplatform applications.
   It contains several subfolders:
   - [commonMain](./composeApp/src/commonMain/kotlin) is for code that’s common for all targets.

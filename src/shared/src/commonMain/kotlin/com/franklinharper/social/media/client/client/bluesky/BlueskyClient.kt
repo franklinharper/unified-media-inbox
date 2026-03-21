@@ -1,6 +1,8 @@
 package com.franklinharper.social.media.client.client.bluesky
 
 import com.franklinharper.social.media.client.client.FollowingImportClient
+import com.franklinharper.social.media.client.client.NetworkHttp
+import com.franklinharper.social.media.client.client.NetworkResponse
 import com.franklinharper.social.media.client.client.PasswordAuthClient
 import com.franklinharper.social.media.client.client.SocialPlatformClient
 import com.franklinharper.social.media.client.domain.AccountSession
@@ -15,23 +17,16 @@ import com.franklinharper.social.media.client.domain.PlatformId
 import com.franklinharper.social.media.client.domain.SeenState
 import com.franklinharper.social.media.client.domain.SessionState
 import com.franklinharper.social.media.client.domain.SocialProfile
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import io.ktor.http.encodeURLParameter
+import kotlinx.datetime.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import java.net.URI
-import java.net.URLEncoder
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-import java.nio.charset.StandardCharsets
-import java.time.Instant
 
 class BlueskyClient(
     private val sessionProvider: suspend () -> AccountSession? = { null },
-    private val fetchAuthorFeed: suspend (String, String?) -> String = { actor, cursor ->
-        defaultFetcher(
+    private val fetchAuthorFeed: suspend (String, String?) -> NetworkResponse = { actor, cursor ->
+        NetworkHttp.get(
             url = buildString {
                 append("https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed?actor=")
                 append(actor.urlEncode())
@@ -41,17 +36,16 @@ class BlueskyClient(
                     append(cursor.urlEncode())
                 }
             },
-            authorization = null,
         )
     },
-    private val createSession: suspend (String, String) -> String = { identifier, password ->
-        defaultJsonPost(
+    private val createSession: suspend (String, String) -> NetworkResponse = { identifier, password ->
+        NetworkHttp.postJson(
             url = "https://bsky.social/xrpc/com.atproto.server.createSession",
             body = """{"identifier":${identifier.toJsonString()},"password":${password.toJsonString()}}""",
         )
     },
-    private val fetchFollows: suspend (String, String?) -> String = { actor, cursor ->
-        defaultFetcher(
+    private val fetchFollows: suspend (String, String?) -> NetworkResponse = { actor, cursor ->
+        NetworkHttp.get(
             url = buildString {
                 append("https://public.api.bsky.app/xrpc/app.bsky.graph.getFollows?actor=")
                 append(actor.urlEncode())
@@ -61,7 +55,6 @@ class BlueskyClient(
                     append(cursor.urlEncode())
                 }
             },
-            authorization = null,
         )
     },
 ) : SocialPlatformClient, PasswordAuthClient, FollowingImportClient {
@@ -76,7 +69,7 @@ class BlueskyClient(
 
     override suspend fun signIn(identifier: String, password: String): AccountSession {
         val payload = try {
-            createSession(identifier, password)
+            createSession(identifier, password).bodyOrThrow()
         } catch (error: Throwable) {
             throw error.asBlueskyException(defaultMessage = "Unable to sign in to Bluesky")
         }
@@ -97,7 +90,7 @@ class BlueskyClient(
         var cursor: String? = null
         do {
             val payload = try {
-                fetchFollows(accountId, cursor)
+                fetchFollows(accountId, cursor).bodyOrThrow()
             } catch (error: Throwable) {
                 throw error.asBlueskyException(defaultMessage = "Unable to load followed accounts")
             }
@@ -123,7 +116,7 @@ class BlueskyClient(
             ?: throw BlueskyClientException(ClientError.PermanentFailure("BlueskyClient requires SocialUsers query"))
         val items = socialQuery.users.flatMap { user ->
             val payload = try {
-                fetchAuthorFeed(user, cursor?.value ?: socialQuery.cursor?.value)
+                fetchAuthorFeed(user, cursor?.value ?: socialQuery.cursor?.value).bodyOrThrow()
             } catch (error: Throwable) {
                 throw error.asBlueskyException(defaultMessage = "Unable to load Bluesky feed")
             }
@@ -143,38 +136,6 @@ class BlueskyClient(
         val json = Json {
             ignoreUnknownKeys = true
             explicitNulls = false
-        }
-
-        val httpClient: HttpClient = HttpClient.newBuilder()
-            .followRedirects(HttpClient.Redirect.NORMAL)
-            .build()
-
-        suspend fun defaultFetcher(
-            url: String,
-            authorization: String?,
-        ): String = withContext(Dispatchers.IO) {
-            val requestBuilder = HttpRequest.newBuilder(URI.create(url))
-                .header("Accept", "application/json")
-                .header("User-Agent", "social-media-client/0.1")
-            if (authorization != null) {
-                requestBuilder.header("Authorization", authorization)
-            }
-            val response = httpClient.send(
-                requestBuilder.GET().build(),
-                HttpResponse.BodyHandlers.ofString(),
-            )
-            response.bodyOrThrow()
-        }
-
-        suspend fun defaultJsonPost(url: String, body: String): String = withContext(Dispatchers.IO) {
-            val request = HttpRequest.newBuilder(URI.create(url))
-                .header("Accept", "application/json")
-                .header("Content-Type", "application/json")
-                .header("User-Agent", "social-media-client/0.1")
-                .POST(HttpRequest.BodyPublishers.ofString(body))
-                .build()
-            val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-            response.bodyOrThrow()
         }
     }
 }
@@ -255,16 +216,16 @@ private fun PostView.toFeedItem(sourceUser: String): FeedItem? {
     )
 }
 
-private fun HttpResponse<String>.bodyOrThrow(): String =
-    if (statusCode() in 200..299) {
-        body()
+private fun NetworkResponse.bodyOrThrow(): String =
+    if (statusCode in 200..299) {
+        body
     } else {
         throw BlueskyClientException(
-            when (statusCode()) {
-                401, 403 -> ClientError.AuthenticationError("HTTP ${statusCode()}")
+            when (statusCode) {
+                401, 403 -> ClientError.AuthenticationError("HTTP $statusCode")
                 429 -> ClientError.RateLimitError()
-                in 400..499 -> ClientError.PermanentFailure("HTTP ${statusCode()}")
-                else -> ClientError.NetworkError("HTTP ${statusCode()}")
+                in 400..499 -> ClientError.PermanentFailure("HTTP $statusCode")
+                else -> ClientError.NetworkError("HTTP $statusCode")
             },
         )
     }
@@ -276,9 +237,9 @@ private fun Throwable.asBlueskyException(defaultMessage: String): BlueskyClientE
     }
 
 private fun parseTimestamp(value: String?): Long? =
-    value?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() }
+    value?.let { runCatching { Instant.parse(it).toEpochMilliseconds() }.getOrNull() }
 
-private fun String.urlEncode(): String = URLEncoder.encode(this, StandardCharsets.UTF_8)
+private fun String.urlEncode(): String = encodeURLParameter()
 
 private fun String.toJsonString(): String =
     buildString(length + 2) {

@@ -1,5 +1,6 @@
 package com.franklinharper.social.media.client.client.bluesky
 
+import com.franklinharper.social.media.client.client.NetworkResponse
 import com.franklinharper.social.media.client.domain.ClientError
 import com.franklinharper.social.media.client.domain.FeedQuery
 import com.franklinharper.social.media.client.domain.PlatformId
@@ -16,7 +17,7 @@ class BlueskyClientTest {
         val client = BlueskyClient(
             fetchAuthorFeed = { actor, _ ->
                 assertEquals("frank", actor)
-                AUTHOR_FEED_JSON
+                NetworkResponse(statusCode = 200, body = AUTHOR_FEED_JSON, headers = emptyMap())
             },
         )
 
@@ -39,7 +40,7 @@ class BlueskyClientTest {
             createSession = { identifier, password ->
                 assertEquals("frank.bsky.social", identifier)
                 assertEquals("app-password", password)
-                CREATE_SESSION_JSON
+                NetworkResponse(statusCode = 200, body = CREATE_SESSION_JSON, headers = emptyMap())
             },
         )
 
@@ -79,6 +80,7 @@ class BlueskyClientTest {
                 } else {
                     FOLLOWS_PAGE_TWO
                 }
+                .let { NetworkResponse(statusCode = 200, body = it, headers = emptyMap()) }
             },
         )
 

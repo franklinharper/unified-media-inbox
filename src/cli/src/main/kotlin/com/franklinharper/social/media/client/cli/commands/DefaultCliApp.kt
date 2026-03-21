@@ -4,9 +4,10 @@ import com.franklinharper.social.media.client.client.ClientRegistry
 import com.franklinharper.social.media.client.client.FollowingImportClient
 import com.franklinharper.social.media.client.client.PasswordAuthClient
 import com.franklinharper.social.media.client.client.bluesky.BlueskyClient
-import com.franklinharper.social.media.client.client.fake.FakeTwitterClient
 import com.franklinharper.social.media.client.client.rss.RssClient
+import com.franklinharper.social.media.client.client.twitter.TwitterClient
 import com.franklinharper.social.media.client.db.JvmDatabaseFactory
+import com.franklinharper.social.media.client.domain.AccountSession
 import com.franklinharper.social.media.client.domain.ConfiguredSource
 import com.franklinharper.social.media.client.domain.ClientFailure
 import com.franklinharper.social.media.client.domain.FeedRequest
@@ -47,7 +48,14 @@ class DefaultCliApp(
                     }
                 },
             ),
-            FakeTwitterClient(itemsByUser = emptyMap()),
+            TwitterClient(
+                sessionProvider = {
+                    when (val state = sessionRepository.getSessionState(PlatformId.Twitter)) {
+                        is SessionState.SignedIn -> state.session
+                        else -> twitterSessionFromEnvironment()
+                    }
+                },
+            ),
         ),
     )
     private val feedRepository = DefaultFeedRepository(
@@ -292,6 +300,7 @@ private val usageText =
       social-cli import-follows bluesky
       social-cli list-new-items --platform bluesky --user frank.bsky.social
       social-cli signin bluesky frank.bsky.social xxxx-xxxx-xxxx-xxxx
+      X_BEARER_TOKEN=xxxx social-cli list-new-items --platform twitter --user frank
     """.trimIndent()
 
 private fun formatStatusLine(status: FeedSourceStatus, itemCount: Int): String {
@@ -342,3 +351,14 @@ private fun Throwable.isSchemaMismatch(): Boolean =
         }
 
 private fun File.deleteIfExists(): Boolean = !exists() || delete()
+
+private fun twitterSessionFromEnvironment(): AccountSession? {
+    val token = sequenceOf("X_BEARER_TOKEN", "TWITTER_BEARER_TOKEN")
+        .mapNotNull { key -> System.getenv(key)?.takeIf(String::isNotBlank) }
+        .firstOrNull()
+        ?: return null
+    return AccountSession(
+        accountId = "twitter-app",
+        accessToken = token,
+    )
+}

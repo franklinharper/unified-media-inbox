@@ -39,7 +39,10 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.json)
+            implementation(libs.ktor.clientCore)
+            implementation(libs.ktor.clientCio)
             implementation(libs.sqldelight.runtime)
             implementation(libs.sqldelight.coroutinesExtensions)
         }
