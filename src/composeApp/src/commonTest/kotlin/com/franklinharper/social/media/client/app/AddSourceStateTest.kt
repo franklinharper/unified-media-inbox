@@ -115,6 +115,36 @@ class AddSourceStateTest {
             repository.sources,
         )
     }
+
+    @Test
+    fun `back to type picker clears transient add-source state`() = runTest {
+        val state = AddSourceState(
+            configuredSourceRepository = AddSourceFakeConfiguredSourceRepository(
+                failure = IllegalStateException("duplicate"),
+            ),
+        )
+
+        state.selectType(SourceType.Rss)
+        state.addRssSource("https://hnrss.org/newest")
+        state.backToTypePicker()
+
+        assertEquals(null, state.uiState.value.selectedType)
+        assertNull(state.uiState.value.addError)
+        assertEquals(false, state.uiState.value.didAddSource)
+    }
+
+    @Test
+    fun `reset flow clears completed add-source state`() = runTest {
+        val state = AddSourceState(
+            configuredSourceRepository = AddSourceFakeConfiguredSourceRepository(),
+        )
+
+        state.selectType(SourceType.Bluesky)
+        state.addBlueskySource("frank.bsky.social")
+        state.resetFlow()
+
+        assertEquals(AddSourceUiState(), state.uiState.value)
+    }
 }
 
 private class AddSourceFakeConfiguredSourceRepository(

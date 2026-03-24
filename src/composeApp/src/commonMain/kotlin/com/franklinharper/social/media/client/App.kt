@@ -9,7 +9,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -69,6 +68,8 @@ fun App() {
                 isWideLayout = layout.isWide,
                 onSelectFeedSource = { source -> feedShellState?.selectFeedSource(source) },
                 onSelectAddSourceType = { type -> addSourceState?.selectType(type) },
+                onOpenAddSource = { addSourceState?.resetFlow() },
+                onBackFromAddSource = { addSourceState?.backToTypePicker() },
                 onAddRssSource = { url ->
                     scope.launch {
                         addSourceState?.addRssSource(url)
@@ -90,12 +91,24 @@ fun App() {
 }
 
 @Composable
+fun AppPreviewContent() {
+    MaterialTheme {
+        AppRoot(
+            feedState = FeedShellUiState(),
+            addSourceState = AddSourceUiState(),
+        )
+    }
+}
+
+@Composable
 internal fun AppRoot(
     feedState: FeedShellUiState,
     addSourceState: AddSourceUiState,
     isWideLayout: Boolean = false,
     onSelectFeedSource: (com.franklinharper.social.media.client.domain.FeedSource?) -> Unit = {},
     onSelectAddSourceType: (SourceType) -> Unit = {},
+    onOpenAddSource: () -> Unit = {},
+    onBackFromAddSource: () -> Unit = {},
     onAddRssSource: (String) -> Unit = {},
     onAddBlueskySource: (String) -> Unit = {},
     onRefreshFeed: () -> Unit = {},
@@ -113,7 +126,10 @@ internal fun AppRoot(
         AppScreen.Feed -> FeedScreen(
             state = feedState,
             isWideLayout = isWideLayout,
-            onAddSourcesClick = { screen = AppScreen.AddSource },
+            onAddSourcesClick = {
+                onOpenAddSource()
+                screen = AppScreen.AddSource
+            },
             onSelectSource = onSelectFeedSource,
             onRefresh = onRefreshFeed,
         )
@@ -121,6 +137,13 @@ internal fun AppRoot(
         AppScreen.AddSource -> AddSourceScreen(
             state = addSourceState,
             onSelectType = onSelectAddSourceType,
+            onBack = {
+                if (addSourceState.selectedType == null) {
+                    screen = AppScreen.Feed
+                } else {
+                    onBackFromAddSource()
+                }
+            },
             onAddRssSource = onAddRssSource,
             onAddBlueskySource = onAddBlueskySource,
         )

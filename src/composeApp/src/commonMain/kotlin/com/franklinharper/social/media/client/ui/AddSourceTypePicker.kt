@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -26,11 +25,6 @@ fun AddSourceTypePicker(
         }
         Button(onClick = { onSelectType(SourceType.Bluesky) }) {
             Text("Bluesky account")
-        }
-        OutlinedButton(
-            onClick = { onSelectType(SourceType.Twitter) },
-        ) {
-            Text("Twitter support coming later")
         }
     }
 }

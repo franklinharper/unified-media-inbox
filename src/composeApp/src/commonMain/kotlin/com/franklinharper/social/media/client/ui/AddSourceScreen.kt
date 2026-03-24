@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -16,6 +17,7 @@ import com.franklinharper.social.media.client.app.SourceType
 fun AddSourceScreen(
     state: AddSourceUiState,
     onSelectType: (SourceType) -> Unit,
+    onBack: () -> Unit,
     onAddRssSource: (String) -> Unit,
     onAddBlueskySource: (String) -> Unit,
 ) {
@@ -29,6 +31,9 @@ fun AddSourceScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            TextButton(onClick = onBack) {
+                Text(if (state.selectedType == null) "Close" else "Back")
+            }
             when (state.selectedType) {
                 null -> AddSourceTypePicker(onSelectType = onSelectType)
                 SourceType.Rss -> AddRssSourceForm(
@@ -41,7 +46,6 @@ fun AddSourceScreen(
                     addError = state.addError,
                     onAddSource = onAddBlueskySource,
                 )
-                SourceType.Twitter -> Text("Twitter support coming later")
             }
         }
     }

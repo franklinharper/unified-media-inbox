@@ -52,8 +52,14 @@ class AddSourceScreenTest {
             AppRoot(
                 feedState = FeedShellUiState(),
                 addSourceState = addSourceState,
+                onOpenAddSource = {
+                    addSourceState = AddSourceUiState()
+                },
                 onSelectAddSourceType = { type ->
                     addSourceState = addSourceState.copy(selectedType = type, didAddSource = false)
+                },
+                onBackFromAddSource = {
+                    addSourceState = addSourceState.copy(selectedType = null, addError = null, didAddSource = false)
                 },
                 onAddRssSource = {
                     addSourceState = AddSourceUiState(didAddSource = true)
@@ -65,6 +71,94 @@ class AddSourceScreenTest {
         onNodeWithText("RSS feed").performClick()
         onNodeWithText("Feed URL").performTextInput("https://hnrss.org/newest")
         onNodeWithText("Add source").performClick()
+
+        onNodeWithText("Feed").assertExists()
+        onNodeWithText("Add a source").assertDoesNotExist()
+    }
+
+    @Test
+    fun `add-source flow can be reopened after a successful add`() = runComposeUiTest {
+        setContent {
+            var addSourceState by remember { mutableStateOf(AddSourceUiState()) }
+            AppRoot(
+                feedState = FeedShellUiState(),
+                addSourceState = addSourceState,
+                onOpenAddSource = {
+                    addSourceState = AddSourceUiState()
+                },
+                onSelectAddSourceType = { type ->
+                    addSourceState = addSourceState.copy(selectedType = type, didAddSource = false)
+                },
+                onBackFromAddSource = {
+                    addSourceState = addSourceState.copy(selectedType = null, addError = null, didAddSource = false)
+                },
+                onAddRssSource = {
+                    addSourceState = AddSourceUiState(didAddSource = true)
+                },
+            )
+        }
+
+        onNodeWithText("Add sources").performClick()
+        onNodeWithText("RSS feed").performClick()
+        onNodeWithText("Feed URL").performTextInput("https://hnrss.org/newest")
+        onNodeWithText("Add source").performClick()
+        onNodeWithText("Add sources").performClick()
+
+        onNodeWithText("Add a source").assertExists()
+    }
+
+    @Test
+    fun `back from source form returns to type picker`() = runComposeUiTest {
+        setContent {
+            var addSourceState by remember { mutableStateOf(AddSourceUiState()) }
+            AppRoot(
+                feedState = FeedShellUiState(),
+                addSourceState = addSourceState,
+                onOpenAddSource = {
+                    addSourceState = AddSourceUiState()
+                },
+                onSelectAddSourceType = { type ->
+                    addSourceState = addSourceState.copy(selectedType = type, didAddSource = false)
+                },
+                onBackFromAddSource = {
+                    addSourceState = addSourceState.copy(selectedType = null, addError = null, didAddSource = false)
+                },
+            )
+        }
+
+        onNodeWithText("Add sources").performClick()
+        onNodeWithText("RSS feed").performClick()
+        onNodeWithText("Back").performClick()
+
+        onNodeWithText("Add a source").assertExists()
+        onNodeWithText("RSS feed").assertExists()
+    }
+
+    @Test
+    fun `twitter placeholder is hidden from add-source picker`() = runComposeUiTest {
+        setContent {
+            AppRoot(
+                feedState = FeedShellUiState(),
+                addSourceState = AddSourceUiState(),
+            )
+        }
+
+        onNodeWithText("Add sources").performClick()
+
+        onNodeWithText("Twitter support coming later").assertDoesNotExist()
+    }
+
+    @Test
+    fun `close from type picker returns to feed`() = runComposeUiTest {
+        setContent {
+            AppRoot(
+                feedState = FeedShellUiState(),
+                addSourceState = AddSourceUiState(),
+            )
+        }
+
+        onNodeWithText("Add sources").performClick()
+        onNodeWithText("Close").performClick()
 
         onNodeWithText("Feed").assertExists()
         onNodeWithText("Add a source").assertDoesNotExist()

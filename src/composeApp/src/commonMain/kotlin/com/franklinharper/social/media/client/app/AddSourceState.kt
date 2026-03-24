@@ -20,6 +20,14 @@ class AddSourceState(
         _uiState.update { it.copy(selectedType = type, addError = null, didAddSource = false) }
     }
 
+    fun backToTypePicker() {
+        _uiState.update { it.copy(selectedType = null, addError = null, didAddSource = false) }
+    }
+
+    fun resetFlow() {
+        _uiState.value = AddSourceUiState()
+    }
+
     suspend fun addRssSource(url: String) {
         addSource(
             type = SourceType.Rss,
@@ -58,5 +66,4 @@ data class AddSourceUiState(
 enum class SourceType {
     Rss,
     Bluesky,
-    Twitter,
 }
