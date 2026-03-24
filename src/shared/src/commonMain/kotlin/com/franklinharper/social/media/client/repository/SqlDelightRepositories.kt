@@ -17,14 +17,19 @@ import com.franklinharper.social.media.client.domain.SourceErrorLogEntry
 
 class SqlDelightConfiguredSourceRepository(
     private val database: SocialMediaDatabase,
+    private val ownerUserId: String = DEFAULT_OWNER_USER_ID,
 ) : ConfiguredSourceRepository {
     private val queries = database.socialMediaDatabaseQueries
 
     override suspend fun listSources(): List<ConfiguredSource> =
-        queries.selectConfiguredSources(::toConfiguredSource).executeAsList()
+        queries.selectConfiguredSources(
+            user_id = ownerUserId,
+            mapper = ::toConfiguredSource,
+        ).executeAsList()
 
     override suspend fun addSource(source: ConfiguredSource) {
         queries.upsertConfiguredSource(
+            user_id = ownerUserId,
             platform_id = source.platformId.serializedName,
             source_kind = source.kind,
             value_ = source.serializedValue,
@@ -33,6 +38,7 @@ class SqlDelightConfiguredSourceRepository(
 
     override suspend fun removeSource(source: ConfiguredSource) {
         queries.removeConfiguredSource(
+            user_id = ownerUserId,
             platform_id = source.platformId.serializedName,
             source_kind = source.kind,
             value_ = source.serializedValue,
@@ -40,33 +46,45 @@ class SqlDelightConfiguredSourceRepository(
     }
 
     override suspend fun clearAll() {
-        queries.removeAllConfiguredSources()
+        queries.removeAllConfiguredSources(user_id = ownerUserId)
     }
 }
 
 class SqlDelightSeenItemRepository(
     private val database: SocialMediaDatabase,
+    private val ownerUserId: String = DEFAULT_OWNER_USER_ID,
     private val clock: () -> Long = { 0L },
 ) : SeenItemRepository {
     private val queries = database.socialMediaDatabaseQueries
 
     override suspend fun markSeen(itemId: String) {
-        queries.markSeen(item_key = itemId, seen_at_epoch_millis = clock())
+        queries.markSeen(
+            user_id = ownerUserId,
+            item_key = itemId,
+            seen_at_epoch_millis = clock(),
+        )
     }
 
     override suspend fun markSeen(itemIds: List<String>) {
         database.transaction {
             itemIds.forEach { itemId ->
-                queries.markSeen(item_key = itemId, seen_at_epoch_millis = clock())
+                queries.markSeen(
+                    user_id = ownerUserId,
+                    item_key = itemId,
+                    seen_at_epoch_millis = clock(),
+                )
             }
         }
     }
 
     override suspend fun isSeen(itemId: String): Boolean =
-        queries.selectSeenItem(item_key = itemId).executeAsOneOrNull() != null
+        queries.selectSeenItem(
+            user_id = ownerUserId,
+            item_key = itemId,
+        ).executeAsOneOrNull() != null
 
     override suspend fun clearAll() {
-        queries.removeAllSeenItems()
+        queries.removeAllSeenItems(user_id = ownerUserId)
     }
 }
 
@@ -104,6 +122,7 @@ class SqlDelightSessionRepository(
 
 class SqlDelightFeedCacheRepository(
     private val database: SocialMediaDatabase,
+    private val ownerUserId: String = DEFAULT_OWNER_USER_ID,
     private val clock: () -> Long = { 0L },
 ) : FeedCacheRepository {
     private val queries = database.socialMediaDatabaseQueries
@@ -112,12 +131,14 @@ class SqlDelightFeedCacheRepository(
         val mapper = ::toFeedItemRow
         return if (includeSeen) {
             queries.selectFeedItemsForSource(
+                user_id = ownerUserId,
                 source_platform_id = source.platformId.serializedName,
                 source_id = source.sourceId,
                 mapper = mapper,
             ).executeAsList()
         } else {
             queries.selectUnseenFeedItemsForSource(
+                user_id = ownerUserId,
                 source_platform_id = source.platformId.serializedName,
                 source_id = source.sourceId,
                 mapper = mapper,
@@ -133,16 +154,19 @@ class SqlDelightFeedCacheRepository(
     ) {
         database.transaction {
             queries.upsertFeedSource(
+                user_id = ownerUserId,
                 platform_id = source.platformId.serializedName,
                 source_id = source.sourceId,
                 display_name = source.displayName,
             )
             queries.removeFeedItemsForSource(
+                user_id = ownerUserId,
                 source_platform_id = source.platformId.serializedName,
                 source_id = source.sourceId,
             )
             items.forEach { item ->
                 queries.upsertFeedItem(
+                    user_id = ownerUserId,
                     item_key = item.cacheKey,
                     item_id = item.itemId,
                     platform_id = item.platformId.serializedName,
@@ -157,10 +181,15 @@ class SqlDelightFeedCacheRepository(
                     cached_at_epoch_millis = clock(),
                 )
                 if (item.seenState is SeenState.Seen) {
-                    queries.markSeen(item_key = item.cacheKey, seen_at_epoch_millis = clock())
+                    queries.markSeen(
+                        user_id = ownerUserId,
+                        item_key = item.cacheKey,
+                        seen_at_epoch_millis = clock(),
+                    )
                 }
             }
             queries.upsertSyncState(
+                user_id = ownerUserId,
                 source_platform_id = source.platformId.serializedName,
                 source_id = source.sourceId,
                 next_cursor_value = nextCursor,
@@ -171,6 +200,7 @@ class SqlDelightFeedCacheRepository(
 
     override suspend fun getSyncState(source: FeedSource): FeedSyncState? =
         queries.selectSyncState(
+            user_id = ownerUserId,
             source_platform_id = source.platformId.serializedName,
             source_id = source.sourceId,
             mapper = ::toFeedSyncState,
@@ -178,15 +208,16 @@ class SqlDelightFeedCacheRepository(
 
     override suspend fun clearAll() {
         database.transaction {
-            queries.removeAllFeedItems()
-            queries.removeAllSyncState()
-            queries.removeAllFeedSources()
+            queries.removeAllFeedItems(user_id = ownerUserId)
+            queries.removeAllSyncState(user_id = ownerUserId)
+            queries.removeAllFeedSources(user_id = ownerUserId)
         }
     }
 }
 
 class SqlDelightSourceErrorRepository(
     private val database: SocialMediaDatabase,
+    private val ownerUserId: String = DEFAULT_OWNER_USER_ID,
 ) : SourceErrorRepository {
     private val queries = database.socialMediaDatabaseQueries
 
@@ -198,11 +229,13 @@ class SqlDelightSourceErrorRepository(
         occurredAtEpochMillis: Long,
     ) {
         queries.upsertFeedSource(
+            user_id = ownerUserId,
             platform_id = source.platformId.serializedName,
             source_id = source.sourceId,
             display_name = source.displayName,
         )
         queries.insertSourceError(
+            user_id = ownerUserId,
             source_platform_id = source.platformId.serializedName,
             source_id = source.sourceId,
             content_origin = contentOrigin.serializedName,
@@ -214,17 +247,18 @@ class SqlDelightSourceErrorRepository(
 
     override suspend fun listErrors(source: FeedSource?, limit: Long): List<SourceErrorLogEntry> =
         if (source == null) {
-            queries.selectAllSourceErrors(limit).executeAsList().map(SelectAllSourceErrors::toDomain)
+            queries.selectAllSourceErrors(ownerUserId, limit).executeAsList().map(SelectAllSourceErrors::toDomain)
         } else {
             queries.selectSourceErrorsForSource(
+                user_id = ownerUserId,
                 source_platform_id = source.platformId.serializedName,
                 source_id = source.sourceId,
                 value_ = limit,
             ).executeAsList().map(SelectSourceErrorsForSource::toDomain)
-        }
+    }
 
     override suspend fun clearAll() {
-        queries.removeAllSourceErrors()
+        queries.removeAllSourceErrors(user_id = ownerUserId)
     }
 }
 
@@ -362,6 +396,8 @@ private val FeedItem.cacheKey: String
 
 private val PlatformId.serializedName: String
     get() = name.lowercase()
+
+private const val DEFAULT_OWNER_USER_ID = ""
 
 private fun PlatformId.Companion.fromSerializedName(value: String): PlatformId = when (value) {
     "rss" -> PlatformId.Rss
