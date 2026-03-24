@@ -1,3 +1,9 @@
 package com.franklinharper.social.media.client.app
 
-internal actual fun createAppContainer(): AppContainer = PlaceholderAppContainer
+import com.franklinharper.social.media.client.db.AndroidDatabaseFactory
+
+internal actual fun createAppContainer(): AppContainer =
+    buildAppContainer(
+        database = AndroidDatabaseFactory.createSocialMediaDatabase(),
+        clock = { System.currentTimeMillis() },
+    )
