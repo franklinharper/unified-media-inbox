@@ -19,6 +19,7 @@ import com.franklinharper.social.media.client.repository.SeenItemRepository
 import com.franklinharper.social.media.client.repository.SessionRepository
 import com.franklinharper.social.media.client.repository.SourceErrorRepository
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
 
 class AppContainerContractTest {
@@ -46,6 +47,16 @@ class AppContainerContractTest {
         assertSame(dependencies.feedCacheRepository, container.feedCacheRepository)
         assertSame(dependencies.sourceErrorRepository, container.sourceErrorRepository)
         assertSame(dependencies.feedRepository, container.feedRepository)
+    }
+
+    @Test
+    fun `createAppContainer returns the placeholder container without throwing`() {
+        val container = createAppContainer()
+
+        assertSame(PlaceholderAppContainer, container)
+        assertFailsWith<IllegalStateException> {
+            container.dependencies
+        }
     }
 }
 
