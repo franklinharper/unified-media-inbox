@@ -18,8 +18,10 @@ import com.franklinharper.social.media.client.repository.FeedRepository
 import com.franklinharper.social.media.client.repository.SeenItemRepository
 import com.franklinharper.social.media.client.repository.SessionRepository
 import com.franklinharper.social.media.client.repository.SourceErrorRepository
+import com.franklinharper.social.media.client.getPlatform
 import kotlin.test.Test
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 class AppContainerContractTest {
 
@@ -52,9 +54,15 @@ class AppContainerContractTest {
     fun `createAppContainer returns the placeholder container without throwing`() {
         val container = createAppContainer()
 
-        assertSame(PlaceholderAppContainer, container)
+        if (isJvmPlatform()) {
+            assertTrue(container !== PlaceholderAppContainer)
+        } else {
+            assertSame(PlaceholderAppContainer, container)
+        }
     }
 }
+
+private fun isJvmPlatform(): Boolean = getPlatform().name.startsWith("Java ")
 
 private object NoOpFeedRepository : FeedRepository {
     override suspend fun loadFeedItems(request: FeedRequest): FeedLoadResult =

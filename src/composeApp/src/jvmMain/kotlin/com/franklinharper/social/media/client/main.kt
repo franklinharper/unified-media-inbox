@@ -6,7 +6,7 @@ import androidx.compose.ui.window.application
 fun main() = application {
     Window(
         onCloseRequest = ::exitApplication,
-        title = "KmpProject",
+        title = "Social Media Client",
     ) {
         App()
     }
