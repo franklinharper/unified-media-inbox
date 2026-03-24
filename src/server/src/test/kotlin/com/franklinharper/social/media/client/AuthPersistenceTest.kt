@@ -10,6 +10,7 @@ import com.franklinharper.social.media.client.repository.SqlDelightFeedCacheRepo
 import com.franklinharper.social.media.client.repository.SqlDelightSeenItemRepository
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
 
@@ -27,18 +28,30 @@ class AuthPersistenceTest {
     }
 
     @Test
+    fun `server rejects sessions for unknown users`() = runBlocking {
+        val database = ServerDatabaseFactory.inMemory()
+        val sessions = ServerSessionService(database)
+
+        val error = assertFailsWith<IllegalStateException> {
+            sessions.createSession("missing-user")
+        }
+
+        assertEquals("Unknown user: missing-user", error.message)
+    }
+
+    @Test
     fun `server scopes shared persistence by user id`() = runBlocking {
         val database = ServerDatabaseFactory.inMemory()
         val sessions = ServerSessionService(database)
         val alice = sessions.createUser("alice@example.com", "secret")
         val bob = sessions.createUser("bob@example.com", "secret")
 
-        val aliceSources = SqlDelightConfiguredSourceRepository(database, ownerUserId = alice.userId)
-        val bobSources = SqlDelightConfiguredSourceRepository(database, ownerUserId = bob.userId)
-        val aliceSeen = SqlDelightSeenItemRepository(database, ownerUserId = alice.userId)
-        val bobSeen = SqlDelightSeenItemRepository(database, ownerUserId = bob.userId)
-        val aliceCache = SqlDelightFeedCacheRepository(database, ownerUserId = alice.userId)
-        val bobCache = SqlDelightFeedCacheRepository(database, ownerUserId = bob.userId)
+        val aliceSources = SqlDelightConfiguredSourceRepository.forUser(database, alice.userId)
+        val bobSources = SqlDelightConfiguredSourceRepository.forUser(database, bob.userId)
+        val aliceSeen = SqlDelightSeenItemRepository.forUser(database, alice.userId)
+        val bobSeen = SqlDelightSeenItemRepository.forUser(database, bob.userId)
+        val aliceCache = SqlDelightFeedCacheRepository.forUser(database, alice.userId)
+        val bobCache = SqlDelightFeedCacheRepository.forUser(database, bob.userId)
 
         val aliceSource = ConfiguredSource.RssFeed(url = "https://example.com/alice.xml")
         val bobSource = ConfiguredSource.SocialUser(PlatformId.Bluesky, "bob")

@@ -48,6 +48,14 @@ class SqlDelightConfiguredSourceRepository(
     override suspend fun clearAll() {
         queries.removeAllConfiguredSources(user_id = ownerUserId)
     }
+
+    companion object {
+        fun forUser(
+            database: SocialMediaDatabase,
+            ownerUserId: String,
+        ): SqlDelightConfiguredSourceRepository =
+            SqlDelightConfiguredSourceRepository(database, requireServerOwnerUserId(ownerUserId))
+    }
 }
 
 class SqlDelightSeenItemRepository(
@@ -85,6 +93,15 @@ class SqlDelightSeenItemRepository(
 
     override suspend fun clearAll() {
         queries.removeAllSeenItems(user_id = ownerUserId)
+    }
+
+    companion object {
+        fun forUser(
+            database: SocialMediaDatabase,
+            ownerUserId: String,
+            clock: () -> Long = { 0L },
+        ): SqlDelightSeenItemRepository =
+            SqlDelightSeenItemRepository(database, requireServerOwnerUserId(ownerUserId), clock)
     }
 }
 
@@ -213,6 +230,15 @@ class SqlDelightFeedCacheRepository(
             queries.removeAllFeedSources(user_id = ownerUserId)
         }
     }
+
+    companion object {
+        fun forUser(
+            database: SocialMediaDatabase,
+            ownerUserId: String,
+            clock: () -> Long = { 0L },
+        ): SqlDelightFeedCacheRepository =
+            SqlDelightFeedCacheRepository(database, requireServerOwnerUserId(ownerUserId), clock)
+    }
 }
 
 class SqlDelightSourceErrorRepository(
@@ -259,6 +285,14 @@ class SqlDelightSourceErrorRepository(
 
     override suspend fun clearAll() {
         queries.removeAllSourceErrors(user_id = ownerUserId)
+    }
+
+    companion object {
+        fun forUser(
+            database: SocialMediaDatabase,
+            ownerUserId: String,
+        ): SqlDelightSourceErrorRepository =
+            SqlDelightSourceErrorRepository(database, requireServerOwnerUserId(ownerUserId))
     }
 }
 
@@ -398,6 +432,9 @@ private val PlatformId.serializedName: String
     get() = name.lowercase()
 
 private const val DEFAULT_OWNER_USER_ID = ""
+
+private fun requireServerOwnerUserId(ownerUserId: String): String =
+    ownerUserId.takeIf(String::isNotBlank) ?: error("Server-owned repositories require a non-blank user id")
 
 private fun PlatformId.Companion.fromSerializedName(value: String): PlatformId = when (value) {
     "rss" -> PlatformId.Rss

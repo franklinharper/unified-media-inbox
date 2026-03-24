@@ -49,6 +49,8 @@ class ServerSessionService(
     }
 
     suspend fun createSession(userId: String): ServerSession {
+        queries.selectUserById(userId).executeAsOneOrNull() ?: error("Unknown user: $userId")
+
         val session = ServerSession(
             token = sessionTokenGenerator(),
             userId = userId,

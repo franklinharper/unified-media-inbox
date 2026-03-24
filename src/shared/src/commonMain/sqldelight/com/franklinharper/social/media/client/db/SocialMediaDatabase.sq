@@ -5,13 +5,15 @@ CREATE TABLE users (
 
 CREATE TABLE user_password_credentials (
   user_id TEXT NOT NULL PRIMARY KEY,
-  password_hash TEXT NOT NULL
+  password_hash TEXT NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
 CREATE TABLE server_sessions (
   token TEXT NOT NULL PRIMARY KEY,
   user_id TEXT NOT NULL,
-  expires_at_epoch_millis INTEGER NOT NULL
+  expires_at_epoch_millis INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
 CREATE TABLE configured_sources (

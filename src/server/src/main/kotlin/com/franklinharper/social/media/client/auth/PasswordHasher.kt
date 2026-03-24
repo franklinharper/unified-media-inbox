@@ -1,6 +1,7 @@
 package com.franklinharper.social.media.client.auth
 
 import java.security.SecureRandom
+import java.security.MessageDigest
 import java.util.Base64
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
@@ -32,7 +33,7 @@ class PasswordHasher(
         val expectedHash = runCatching { Base64.getDecoder().decode(parts[2]) }.getOrNull() ?: return false
 
         val derivedKey = deriveKey(password, salt, storedIterations)
-        return derivedKey.contentEquals(expectedHash)
+        return MessageDigest.isEqual(derivedKey, expectedHash)
     }
 
     private fun deriveKey(password: String, salt: ByteArray, iterationsOverride: Int = iterations): ByteArray {
