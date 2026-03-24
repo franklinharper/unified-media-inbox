@@ -65,6 +65,9 @@ kotlin {
         jsMain.dependencies {
             implementation(libs.sqldelight.webWorkerDriver)
         }
+        wasmJsMain.dependencies {
+            implementation(libs.sqldelight.webWorkerDriver)
+        }
     }
 }
 
