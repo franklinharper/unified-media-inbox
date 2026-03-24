@@ -16,6 +16,7 @@ import com.franklinharper.social.media.client.app.VisibleFeedEmptyState
 fun FeedScreen(
     state: FeedShellUiState,
     isWideLayout: Boolean = false,
+    onAddSourcesClick: () -> Unit = {},
 ) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -32,8 +33,10 @@ fun FeedScreen(
             when (val emptyState = state.emptyState) {
                 VisibleFeedEmptyState.NoConfiguredSources -> {
                     EmptyFeedState(
-                        title = "Add sources",
+                        title = "No sources yet",
                         message = "Add an RSS feed or social account to start building your feed.",
+                        actionLabel = "Add sources",
+                        onActionClick = onAddSourcesClick,
                     )
                 }
 

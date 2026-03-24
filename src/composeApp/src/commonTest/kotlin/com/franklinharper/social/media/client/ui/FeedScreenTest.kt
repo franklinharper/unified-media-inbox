@@ -1,6 +1,7 @@
 package com.franklinharper.social.media.client.ui
 
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runComposeUiTest
 import com.franklinharper.social.media.client.app.FeedShellUiState
@@ -17,7 +18,7 @@ class FeedScreenTest {
     fun `feed screen shows add sources empty state when no sources exist`() = runComposeUiTest {
         setContent { FeedScreen(state = fakeState(noSources = true)) }
 
-        onNodeWithText("Add sources").assertExists()
+        onNodeWithText("Add sources").assertExists().assertHasClickAction()
     }
 
     @Test
@@ -38,7 +39,12 @@ class FeedScreenTest {
 
         setContent { FeedScreen(state = fakeState(items = listOf(oldest, newest))) }
 
-        onNodeWithText(oldest.title!!).assertExists()
+        val oldestY = onNodeWithText(oldest.title!!).fetchSemanticsNode().positionInRoot.y
+        val newestY = onNodeWithText(newest.title!!).fetchSemanticsNode().positionInRoot.y
+
+        check(oldestY < newestY) {
+            "Expected oldest item to render above newest item, but positions were $oldestY and $newestY."
+        }
     }
 
     @Test
