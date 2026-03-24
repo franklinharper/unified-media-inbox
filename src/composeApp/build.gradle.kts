@@ -1,5 +1,4 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
-import org.jetbrains.compose.ExperimentalComposeLibrary
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
@@ -10,7 +9,6 @@ plugins {
     alias(libs.plugins.composeHotReload)
 }
 
-@OptIn(ExperimentalComposeLibrary::class)
 kotlin {
     androidLibrary {
         namespace = "com.franklinharper.social.media.client.composeapp"
@@ -55,8 +53,6 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
-            implementation(libs.kotlinx.coroutines.test)
-            implementation(compose.uiTest)
         }
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
