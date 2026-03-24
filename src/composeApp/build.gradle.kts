@@ -62,6 +62,9 @@ kotlin {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
         }
+        jsMain.dependencies {
+            implementation(libs.sqldelight.webWorkerDriver)
+        }
     }
 }
 
