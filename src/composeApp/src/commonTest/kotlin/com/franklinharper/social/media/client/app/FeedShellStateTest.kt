@@ -11,7 +11,7 @@ import com.franklinharper.social.media.client.domain.PlatformId
 import com.franklinharper.social.media.client.domain.SeenState
 import com.franklinharper.social.media.client.repository.ConfiguredSourceRepository
 import com.franklinharper.social.media.client.repository.FeedRepository
-import java.util.concurrent.CancellationException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -75,7 +75,8 @@ class FeedShellStateTest {
         state.start()
         state.selectSource(blueskySource)
 
-        assertEquals(blueskySource, state.uiState.value.selectedSource)
+        assertEquals(blueskySource.sourceId, state.uiState.value.selectedSourceId)
+        assertEquals(blueskySource, state.uiState.value.selectedSourceKey)
         assertEquals(listOf("bsky-item"), state.uiState.value.visibleItems.map { it.itemId })
     }
 
@@ -97,7 +98,7 @@ class FeedShellStateTest {
         state.selectSource(selectedSource)
 
         assertEquals(listOf(selectedSource), state.sources)
-        assertEquals(VisibleFeedEmptyState.NoItemsForSelectedSource(selectedSource), state.emptyState)
+        assertEquals(VisibleFeedEmptyState.NoItemsForSelectedSource(selectedSource.sourceId), state.emptyState)
     }
 
     @Test

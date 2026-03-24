@@ -8,7 +8,7 @@ import com.franklinharper.social.media.client.domain.FeedRequest
 import com.franklinharper.social.media.client.domain.FeedSource
 import com.franklinharper.social.media.client.repository.ConfiguredSourceRepository
 import com.franklinharper.social.media.client.repository.FeedRepository
-import java.util.concurrent.CancellationException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,7 +34,10 @@ class FeedShellState(
             _uiState.update { current ->
                 current.copy(
                     sources = sources,
-                    selectedSource = current.selectedSource?.takeIf(sources::contains),
+                    selectedSourceKey = current.selectedSourceKey?.takeIf(sources::contains)
+                        ?: current.selectedSourceId?.let { sourceId ->
+                            sources.firstOrNull { it.sourceId == sourceId }
+                        },
                 )
             }
             val result = feedRepository.loadFeedItems(
@@ -63,7 +66,22 @@ class FeedShellState(
 
     fun selectSource(source: FeedSource?) {
         _uiState.update { current ->
-            current.copy(selectedSource = source?.takeIf(current.sources::contains))
+            current.copy(
+                selectedSourceId = source?.sourceId,
+                selectedSourceKey = source?.takeIf(current.sources::contains),
+            )
+        }
+    }
+
+    fun selectSource(sourceId: String?) {
+        _uiState.update { current ->
+            current.copy(
+                selectedSourceId = sourceId,
+                selectedSourceKey = sourceId?.let { id ->
+                    current.selectedSourceKey?.takeIf { it.sourceId == id && current.sources.contains(it) }
+                        ?: current.sources.firstOrNull { it.sourceId == id }
+                },
+            )
         }
     }
 
@@ -85,13 +103,14 @@ class FeedShellState(
 
 data class FeedShellUiState(
     val sources: List<FeedSource> = emptyList(),
-    val selectedSource: FeedSource? = null,
+    val selectedSourceId: String? = null,
+    internal val selectedSourceKey: FeedSource? = null,
     val items: List<FeedItem> = emptyList(),
     val isLoading: Boolean = false,
     val loadError: ClientError? = null,
 ) {
     val visibleItems: List<FeedItem>
-        get() = when (val source = selectedSource) {
+        get() = when (val source = selectedSourceKey) {
             null -> items
             else -> items.filter { it.source == source }
         }
@@ -100,14 +119,14 @@ data class FeedShellUiState(
         get() = when {
             loadError != null -> null
             sources.isEmpty() -> VisibleFeedEmptyState.NoConfiguredSources
-            visibleItems.isEmpty() && selectedSource != null -> VisibleFeedEmptyState.NoItemsForSelectedSource(selectedSource)
+            visibleItems.isEmpty() && selectedSourceId != null -> VisibleFeedEmptyState.NoItemsForSelectedSource(selectedSourceId)
             else -> null
         }
 }
 
 sealed interface VisibleFeedEmptyState {
     data object NoConfiguredSources : VisibleFeedEmptyState
-    data class NoItemsForSelectedSource(val source: FeedSource) : VisibleFeedEmptyState
+    data class NoItemsForSelectedSource(val sourceId: String) : VisibleFeedEmptyState
 }
 
 private fun ConfiguredSource.toFeedSource(): FeedSource = when (this) {
