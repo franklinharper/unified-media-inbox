@@ -1,76 +1,113 @@
 package com.franklinharper.social.media.client.app
 
 import com.franklinharper.social.media.client.domain.ClientError
+import com.franklinharper.social.media.client.domain.ClientFailure
 import com.franklinharper.social.media.client.domain.ConfiguredSource
 import com.franklinharper.social.media.client.domain.FeedItem
 import com.franklinharper.social.media.client.domain.FeedRequest
 import com.franklinharper.social.media.client.domain.FeedSource
-import com.franklinharper.social.media.client.domain.ClientFailure
 import com.franklinharper.social.media.client.repository.ConfiguredSourceRepository
 import com.franklinharper.social.media.client.repository.FeedRepository
+import java.util.concurrent.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 class FeedShellState(
     private val configuredSourceRepository: ConfiguredSourceRepository,
     private val feedRepository: FeedRepository,
 ) {
-    private var configuredSources: List<FeedSource> = emptyList()
-    private var loadedItems: List<FeedItem> = emptyList()
-    private var selectedSourceId: String? = null
-    private var loading = false
-    private var error: ClientError? = null
+    private val _uiState = MutableStateFlow(FeedShellUiState())
+
+    val uiState: StateFlow<FeedShellUiState> = _uiState.asStateFlow()
 
     suspend fun start() {
         refresh()
     }
 
     suspend fun refresh() {
-        loading = true
-        error = null
+        _uiState.update { it.copy(isLoading = true, loadError = null) }
         try {
             val configuredSources = configuredSourceRepository.listSources()
             val sources = configuredSources.map { it.toFeedSource() }
-            this.configuredSources = sources
+            _uiState.update { current ->
+                current.copy(
+                    sources = sources,
+                    selectedSource = current.selectedSource?.takeIf(sources::contains),
+                )
+            }
             val result = feedRepository.loadFeedItems(
                 FeedRequest(
                     sources = configuredSources,
                 ),
             )
-            loadedItems = result.items
+            _uiState.update { current ->
+                current.copy(
+                    items = result.items,
+                    isLoading = false,
+                )
+            }
+        } catch (cancellation: CancellationException) {
+            _uiState.update { it.copy(isLoading = false) }
+            throw cancellation
         } catch (failure: Throwable) {
-            error = failure.toClientError()
-        } finally {
-            loading = false
+            _uiState.update { current ->
+                current.copy(
+                    isLoading = false,
+                    loadError = failure.toClientError(),
+                )
+            }
         }
     }
 
-    fun selectSource(sourceId: String?) {
-        selectedSourceId = sourceId
+    fun selectSource(source: FeedSource?) {
+        _uiState.update { current ->
+            current.copy(selectedSource = source?.takeIf(current.sources::contains))
+        }
     }
 
     val sources: List<FeedSource>
-        get() = configuredSources
+        get() = uiState.value.sources
 
     val visibleItems: List<FeedItem>
-        get() = loadedItems.filter { selectedSourceId == null || it.source.sourceId == selectedSourceId }
+        get() = uiState.value.visibleItems
+
+    val emptyState: VisibleFeedEmptyState?
+        get() = uiState.value.emptyState
+
+    val isLoading: Boolean
+        get() = uiState.value.isLoading
+
+    val loadError: ClientError?
+        get() = uiState.value.loadError
+}
+
+data class FeedShellUiState(
+    val sources: List<FeedSource> = emptyList(),
+    val selectedSource: FeedSource? = null,
+    val items: List<FeedItem> = emptyList(),
+    val isLoading: Boolean = false,
+    val loadError: ClientError? = null,
+) {
+    val visibleItems: List<FeedItem>
+        get() = when (val source = selectedSource) {
+            null -> items
+            else -> items.filter { it.source == source }
+        }
 
     val emptyState: VisibleFeedEmptyState?
         get() = when {
-            error != null -> null
+            loadError != null -> null
             sources.isEmpty() -> VisibleFeedEmptyState.NoConfiguredSources
-            visibleItems.isEmpty() && selectedSourceId != null -> VisibleFeedEmptyState.NoItemsForSelectedSource(selectedSourceId!!)
+            visibleItems.isEmpty() && selectedSource != null -> VisibleFeedEmptyState.NoItemsForSelectedSource(selectedSource)
             else -> null
         }
-
-    val isLoading: Boolean
-        get() = loading
-
-    val loadError: ClientError?
-        get() = error
 }
 
 sealed interface VisibleFeedEmptyState {
     data object NoConfiguredSources : VisibleFeedEmptyState
-    data class NoItemsForSelectedSource(val sourceId: String) : VisibleFeedEmptyState
+    data class NoItemsForSelectedSource(val source: FeedSource) : VisibleFeedEmptyState
 }
 
 private fun ConfiguredSource.toFeedSource(): FeedSource = when (this) {
