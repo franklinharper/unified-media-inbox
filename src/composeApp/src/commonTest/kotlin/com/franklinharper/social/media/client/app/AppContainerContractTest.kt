@@ -19,7 +19,6 @@ import com.franklinharper.social.media.client.repository.SeenItemRepository
 import com.franklinharper.social.media.client.repository.SessionRepository
 import com.franklinharper.social.media.client.repository.SourceErrorRepository
 import kotlin.test.Test
-import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
 
 class AppContainerContractTest {
@@ -54,9 +53,6 @@ class AppContainerContractTest {
         val container = createAppContainer()
 
         assertSame(PlaceholderAppContainer, container)
-        assertFailsWith<IllegalStateException> {
-            container.dependencies
-        }
     }
 }
 

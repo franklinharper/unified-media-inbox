@@ -5,4 +5,4 @@ internal object PlaceholderAppContainer : AppContainer {
         get() = error("App container is not implemented yet")
 }
 
-expect fun createAppContainer(): AppContainer
+internal expect fun createAppContainer(): AppContainer
