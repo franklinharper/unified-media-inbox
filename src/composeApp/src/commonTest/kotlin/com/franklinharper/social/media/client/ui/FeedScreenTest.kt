@@ -130,7 +130,7 @@ class FeedScreenTest {
 
     @Test
     fun `clicking non-url item opens detail screen`() = runComposeUiTest {
-        val source = FeedSource(PlatformId.Rss, "rss-1", "rss-1")
+        val source = FeedSource(PlatformId.Bluesky, "user-1", "user-1")
         val item = feedItem(
             itemId = "item-1",
             source = source,
@@ -153,14 +153,15 @@ class FeedScreenTest {
     }
 
     @Test
-    fun `clicking url item opens external browser instead of detail screen`() = runComposeUiTest {
+    fun `clicking rss item opens permalink in external browser`() = runComposeUiTest {
         val source = FeedSource(PlatformId.Rss, "rss-1", "rss-1")
         val item = feedItem(
             itemId = "item-1",
             source = source,
             publishedAtEpochMillis = 7_000L,
             title = "Url item",
-            body = "https://example.com/post",
+            body = "Body text",
+            permalink = "https://example.com/post",
         )
         var openedUrl: String? = null
 
@@ -176,6 +177,33 @@ class FeedScreenTest {
 
         kotlin.test.assertEquals("https://example.com/post", openedUrl)
         onNodeWithTag("feed-item-detail-close").assertDoesNotExist()
+    }
+
+    @Test
+    fun `comments button opens comments link from feed item`() = runComposeUiTest {
+        val source = FeedSource(PlatformId.Rss, "rss-1", "rss-1")
+        val item = feedItem(
+            itemId = "item-1",
+            source = source,
+            publishedAtEpochMillis = 7_000L,
+            title = "Commented item",
+            body = "Body text",
+            permalink = "https://example.com/post",
+            commentsPermalink = "https://example.com/post/comments",
+        )
+        var openedUrl: String? = null
+
+        setContent {
+            AppRoot(
+                feedState = fakeState(items = listOf(item)),
+                addSourceState = com.franklinharper.social.media.client.app.AddSourceUiState(),
+                onOpenExternalUrl = { openedUrl = it },
+            )
+        }
+
+        onNodeWithTag("feed-item-comments-button-item-1").performClick()
+
+        kotlin.test.assertEquals("https://example.com/post/comments", openedUrl)
     }
 }
 
@@ -201,6 +229,7 @@ private fun feedItem(
     title: String,
     body: String? = null,
     permalink: String? = null,
+    commentsPermalink: String? = null,
 ): FeedItem = FeedItem(
     itemId = itemId,
     platformId = source.platformId,
@@ -209,6 +238,7 @@ private fun feedItem(
     title = title,
     body = body,
     permalink = permalink,
+    commentsPermalink = commentsPermalink,
     publishedAtEpochMillis = publishedAtEpochMillis,
     seenState = SeenState.Unseen,
 )

@@ -95,6 +95,7 @@ class SqlDelightRepositoriesJvmTest {
                 title = "First",
                 body = "Body one",
                 permalink = "https://example.com/1",
+                commentsPermalink = "https://example.com/1/comments",
                 publishedAtEpochMillis = 100L,
                 seenState = SeenState.Unseen,
             )
@@ -106,6 +107,7 @@ class SqlDelightRepositoriesJvmTest {
                 title = "Second",
                 body = "Body two",
                 permalink = "https://example.com/2",
+                commentsPermalink = null,
                 publishedAtEpochMillis = 200L,
                 seenState = SeenState.Seen,
             )

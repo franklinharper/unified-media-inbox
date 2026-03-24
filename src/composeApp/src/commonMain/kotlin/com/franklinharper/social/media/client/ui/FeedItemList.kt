@@ -6,11 +6,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.franklinharper.social.media.client.domain.FeedItem
 import kotlin.time.Duration.Companion.milliseconds
@@ -21,6 +23,7 @@ fun FeedItemList(
     isWideLayout: Boolean,
     nowEpochMillis: Long,
     onOpenItem: (FeedItem) -> Unit = {},
+    onOpenComments: (String) -> Unit = {},
 ) {
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -38,6 +41,14 @@ fun FeedItemList(
                     Text(item.title ?: item.source.displayName)
                     item.authorName?.let { Text(it) }
                     Text(formatRelativeTimestamp(nowEpochMillis, item.publishedAtEpochMillis))
+                    item.commentsPermalink?.let { commentsUrl ->
+                        Button(
+                            onClick = { onOpenComments(commentsUrl) },
+                            modifier = Modifier.testTag("feed-item-comments-button-${item.itemId}"),
+                        ) {
+                            Text("Comments")
+                        }
+                    }
                 }
             }
         }

@@ -31,6 +31,7 @@ fun FeedScreen(
     onSelectSource: (FeedSource?) -> Unit = {},
     onRefresh: () -> Unit = {},
     onOpenItem: (FeedItem) -> Unit = {},
+    onOpenComments: (String) -> Unit = {},
     nowEpochMillis: Long = Clock.System.now().toEpochMilliseconds(),
 ) {
     Scaffold(
@@ -117,6 +118,7 @@ fun FeedScreen(
                                 isWideLayout = isWideLayout,
                                 nowEpochMillis = nowEpochMillis,
                                 onOpenItem = onOpenItem,
+                                onOpenComments = onOpenComments,
                             )
                         }
                     }

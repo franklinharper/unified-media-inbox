@@ -21,6 +21,7 @@ class RssClientTest {
         assertEquals("Feed Title", page.items.first().source.displayName)
         assertEquals(PlatformId.Rss, page.items.first().platformId)
         assertEquals("guid-2", page.items.first().itemId)
+        assertEquals("https://example.com/comments/2", page.items.first().commentsPermalink)
     }
 
     @Test
@@ -66,6 +67,7 @@ class RssClientTest {
                   <guid>guid-2</guid>
                   <pubDate>Fri, 20 Mar 2026 11:00:00 GMT</pubDate>
                   <description>Item two</description>
+                  <comments>https://example.com/comments/2</comments>
                 </item>
               </channel>
             </rss>

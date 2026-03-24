@@ -74,6 +74,7 @@ data class FeedItem(
     val title: String?,
     val body: String?,
     val permalink: String?,
+    val commentsPermalink: String? = null,
     val publishedAtEpochMillis: Long,
     val seenState: SeenState,
 )

@@ -66,6 +66,7 @@ class RssClient(
         )
         return channel.childElements("item").mapIndexed { index, item ->
             val permalink = item.childText("link")
+            val commentsPermalink = item.childText("comments")
             val guid = item.childText("guid")
             FeedItem(
                 itemId = guid ?: permalink ?: "rss-$index-${item.childText("title") ?: "item"}",
@@ -75,6 +76,7 @@ class RssClient(
                 title = item.childText("title"),
                 body = item.childText("description") ?: item.childText("encoded"),
                 permalink = permalink,
+                commentsPermalink = commentsPermalink,
                 publishedAtEpochMillis = parseDate(item.childText("pubDate")) ?: 0L,
                 seenState = SeenState.Unseen,
             )

@@ -35,6 +35,7 @@ CREATE TABLE feed_items (
   title TEXT,
   body TEXT,
   permalink TEXT,
+  comments_permalink TEXT,
   published_at_epoch_millis INTEGER NOT NULL,
   cached_at_epoch_millis INTEGER NOT NULL,
   FOREIGN KEY (source_platform_id, source_id) REFERENCES feed_sources(platform_id, source_id) ON DELETE CASCADE
@@ -129,10 +130,11 @@ INSERT OR REPLACE INTO feed_items(
   title,
   body,
   permalink,
+  comments_permalink,
   published_at_epoch_millis,
   cached_at_epoch_millis
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 selectFeedItemsForSource:
 SELECT
@@ -146,6 +148,7 @@ SELECT
   fi.title,
   fi.body,
   fi.permalink,
+  fi.comments_permalink,
   fi.published_at_epoch_millis,
   si.item_key AS seen_item_key
 FROM feed_items fi
@@ -168,6 +171,7 @@ SELECT
   fi.title,
   fi.body,
   fi.permalink,
+  fi.comments_permalink,
   fi.published_at_epoch_millis,
   si.item_key AS seen_item_key
 FROM feed_items fi

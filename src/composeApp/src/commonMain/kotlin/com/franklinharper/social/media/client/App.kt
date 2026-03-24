@@ -139,10 +139,11 @@ internal fun AppRoot(
             },
             onSelectSource = onSelectFeedSource,
             onRefresh = onRefreshFeed,
+            onOpenComments = onOpenExternalUrl,
             onOpenItem = { item ->
-                val content = item.body?.trim().takeUnless { it.isNullOrEmpty() } ?: item.permalink?.trim()
-                if (content != null && content.isWebUrl()) {
-                    onOpenExternalUrl(content)
+                val externalUrl = item.externalOpenUrl()
+                if (externalUrl != null) {
+                    onOpenExternalUrl(externalUrl)
                 } else {
                     selectedItem = item
                     screen = AppScreen.ItemDetail
@@ -181,10 +182,11 @@ internal fun AppRoot(
             },
             onSelectSource = onSelectFeedSource,
             onRefresh = onRefreshFeed,
+            onOpenComments = onOpenExternalUrl,
             onOpenItem = { item ->
-                val content = item.body?.trim().takeUnless { it.isNullOrEmpty() } ?: item.permalink?.trim()
-                if (content != null && content.isWebUrl()) {
-                    onOpenExternalUrl(content)
+                val externalUrl = item.externalOpenUrl()
+                if (externalUrl != null) {
+                    onOpenExternalUrl(externalUrl)
                 } else {
                     selectedItem = item
                     screen = AppScreen.ItemDetail
@@ -201,3 +203,11 @@ private enum class AppScreen {
 }
 
 private fun String.isWebUrl(): Boolean = startsWith("http://") || startsWith("https://")
+
+private fun FeedItem.externalOpenUrl(): String? = when {
+    platformId == com.franklinharper.social.media.client.domain.PlatformId.Rss ->
+        permalink?.trim()?.takeIf(String::isWebUrl)
+    else ->
+        body?.trim()?.takeUnless { it.isNullOrEmpty() }?.takeIf(String::isWebUrl)
+            ?: permalink?.trim()?.takeIf(String::isWebUrl)
+}

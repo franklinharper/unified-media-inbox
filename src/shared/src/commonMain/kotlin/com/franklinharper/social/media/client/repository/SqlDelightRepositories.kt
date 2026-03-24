@@ -152,6 +152,7 @@ class SqlDelightFeedCacheRepository(
                     title = item.title,
                     body = item.body,
                     permalink = item.permalink,
+                    comments_permalink = item.commentsPermalink,
                     published_at_epoch_millis = item.publishedAtEpochMillis,
                     cached_at_epoch_millis = clock(),
                 )
@@ -264,6 +265,7 @@ private fun toFeedItemRow(
     title: String?,
     body: String?,
     permalink: String?,
+    comments_permalink: String?,
     published_at_epoch_millis: Long,
     seen_item_key: String?,
 ): FeedItem = FeedItem(
@@ -278,6 +280,7 @@ private fun toFeedItemRow(
     title = title,
     body = body,
     permalink = permalink,
+    commentsPermalink = comments_permalink,
     publishedAtEpochMillis = published_at_epoch_millis,
     seenState = if (seen_item_key == null) SeenState.Unseen else SeenState.Seen,
 )
