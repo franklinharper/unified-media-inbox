@@ -21,15 +21,21 @@ class AddSourceState(
     }
 
     suspend fun addRssSource(url: String) {
-        addSource(ConfiguredSource.RssFeed(url = url))
+        addSource(
+            type = SourceType.Rss,
+            source = ConfiguredSource.RssFeed(url = url),
+        )
     }
 
     suspend fun addBlueskySource(handle: String) {
-        addSource(ConfiguredSource.SocialUser(platformId = PlatformId.Bluesky, user = handle))
+        addSource(
+            type = SourceType.Bluesky,
+            source = ConfiguredSource.SocialUser(platformId = PlatformId.Bluesky, user = handle),
+        )
     }
 
-    private suspend fun addSource(source: ConfiguredSource) {
-        _uiState.update { it.copy(isAdding = true, addError = null) }
+    private suspend fun addSource(type: SourceType, source: ConfiguredSource) {
+        _uiState.update { it.copy(selectedType = type, isAdding = true, addError = null) }
         try {
             configuredSourceRepository.addSource(source)
             _uiState.update { it.copy(isAdding = false) }

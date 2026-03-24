@@ -4,6 +4,8 @@ import com.franklinharper.social.media.client.domain.ConfiguredSource
 import com.franklinharper.social.media.client.domain.PlatformId
 import com.franklinharper.social.media.client.repository.ConfiguredSourceRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -79,6 +81,35 @@ class AddSourceStateTest {
         }
         assertFalse(state.uiState.value.isAdding)
     }
+
+    @Test
+    fun `add source exposes in flight adding state`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val addStarted = CompletableDeferred<Unit>()
+        val repository = SuspendedConfiguredSourceRepository(
+            addStarted = addStarted,
+            gate = gate,
+        )
+        val state = AddSourceState(configuredSourceRepository = repository)
+
+        val addJob = launch {
+            state.addRssSource("https://hnrss.org/newest")
+        }
+
+        addStarted.await()
+        assertEquals(SourceType.Rss, state.uiState.value.selectedType)
+        assertEquals(true, state.uiState.value.isAdding)
+        assertNull(state.uiState.value.addError)
+
+        gate.complete(Unit)
+        addJob.join()
+
+        assertFalse(state.uiState.value.isAdding)
+        assertEquals(
+            listOf<ConfiguredSource>(ConfiguredSource.RssFeed(url = "https://hnrss.org/newest")),
+            repository.sources,
+        )
+    }
 }
 
 private class AddSourceFakeConfiguredSourceRepository(
@@ -90,6 +121,29 @@ private class AddSourceFakeConfiguredSourceRepository(
 
     override suspend fun addSource(source: ConfiguredSource) {
         failure?.let { throw it }
+        sources += source
+    }
+
+    override suspend fun removeSource(source: ConfiguredSource) {
+        error("Not used")
+    }
+
+    override suspend fun clearAll() {
+        error("Not used")
+    }
+}
+
+private class SuspendedConfiguredSourceRepository(
+    private val addStarted: CompletableDeferred<Unit>,
+    private val gate: CompletableDeferred<Unit>,
+) : ConfiguredSourceRepository {
+    val sources = mutableListOf<ConfiguredSource>()
+
+    override suspend fun listSources(): List<ConfiguredSource> = sources.toList()
+
+    override suspend fun addSource(source: ConfiguredSource) {
+        addStarted.complete(Unit)
+        gate.await()
         sources += source
     }
 
