@@ -58,6 +58,8 @@ If the session expires or the server returns unauthorized:
 
 The web client should assume server connectivity is required. Offline-first behavior is not part of this design.
 
+For web users, the browser should talk only to the project server. RSS and Bluesky fetches should be performed by the server rather than directly by browser code.
+
 ### Desktop and Mobile
 
 Desktop, Android, and iOS continue using local app containers and local persistence. Their existing GUI entry flow remains the feed shell rather than a login gate.
@@ -108,8 +110,17 @@ At minimum it must support:
 - per-user feed-item persistence or cache state
 - per-user seen state
 - feed refresh operations
+- outbound RSS and Bluesky fetches on behalf of authenticated web users
 
 For the first cut, synchronous refresh is acceptable. A later background-job model is optional and out of scope here unless latency proves unacceptable.
+
+For the web target, refresh should follow this model:
+
+1. the browser calls the server
+2. the server reads the user's configured sources
+3. the server performs RSS and Bluesky requests as needed
+4. the server updates stored feed and seen-state data
+5. the server returns feed results to the browser
 
 ## Data Model Direction
 
@@ -198,5 +209,6 @@ Routine iOS verification remains deferred during development unless the task is 
 - Desktop, Android, and iOS remain local-persistence based for now
 - The shared module remains the application boundary
 - The server becomes the source of truth for web users
+- The browser talks to the project server, not directly to RSS or Bluesky, for web-user feed operations
 - The first implementation uses a shared database with per-row `user_id` ownership
 - The first auth flow should be a simple owned login mechanism, not a large OAuth matrix
