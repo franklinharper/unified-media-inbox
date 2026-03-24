@@ -2,7 +2,10 @@ package com.franklinharper.social.media.client.ui
 
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.franklinharper.social.media.client.app.FeedShellUiState
 import com.franklinharper.social.media.client.domain.FeedItem
@@ -10,6 +13,7 @@ import com.franklinharper.social.media.client.domain.FeedSource
 import com.franklinharper.social.media.client.domain.PlatformId
 import com.franklinharper.social.media.client.domain.SeenState
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 
 @OptIn(ExperimentalTestApi::class)
 class FeedScreenTest {
@@ -53,16 +57,50 @@ class FeedScreenTest {
 
         onNodeWithText("No items for this source").assertExists()
     }
+
+    @Test
+    fun `narrow layout uses dropdown source selector`() = runComposeUiTest {
+        setContent { FeedScreen(state = fakeState()) }
+
+        onNodeWithTag("source-filter-dropdown").assertExists()
+        onNodeWithTag("source-filter-trigger").assertTextEquals("All items")
+    }
+
+    @Test
+    fun `wide layout uses persistent source panel`() = runComposeUiTest {
+        setContent { FeedScreen(state = fakeState(), isWideLayout = true) }
+
+        onNodeWithTag("source-panel").assertExists()
+        onNodeWithText("All items").assertExists()
+    }
+
+    @Test
+    fun `narrow layout dropdown emits source selection`() = runComposeUiTest {
+        val selectedSources = mutableListOf<String?>()
+        val source = FeedSource(PlatformId.Bluesky, "user-1", "Alice")
+        setContent {
+            FeedScreen(
+                state = fakeState(sources = listOf(source)),
+                onSelectSource = { selectedSources += it?.sourceId },
+            )
+        }
+
+        onNodeWithTag("source-filter-trigger").performClick()
+        onNodeWithText("Alice").performClick()
+
+        assertContentEquals(listOf("user-1"), selectedSources)
+    }
 }
 
 private fun fakeState(
     noSources: Boolean = false,
     noItemsForSelectedSource: Boolean = false,
     items: List<FeedItem> = emptyList(),
+    sources: List<FeedSource> = listOf(FeedSource(PlatformId.Rss, "rss-1", "rss-1")),
 ): FeedShellUiState {
-    val source = FeedSource(PlatformId.Rss, "rss-1", "rss-1")
+    val source = sources.first()
     return FeedShellUiState(
-        sources = if (noSources) emptyList() else listOf(source),
+        sources = if (noSources) emptyList() else sources,
         selectedSourceId = if (noItemsForSelectedSource) source.sourceId else null,
         selectedSourceKey = if (noItemsForSelectedSource) source else null,
         items = if (noItemsForSelectedSource) emptyList() else items,
