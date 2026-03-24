@@ -109,6 +109,46 @@ class FeedScreenTest {
     }
 
     @Test
+    fun `show seen items button emits action at bottom of feed`() = runComposeUiTest {
+        var showSeenCount = 0
+        val source = FeedSource(PlatformId.Rss, "rss-1", "rss-1")
+        val item = feedItem(
+            itemId = "item-1",
+            source = source,
+            publishedAtEpochMillis = 1L,
+            title = "Visible item",
+        )
+
+        setContent {
+            FeedScreen(
+                state = fakeState(items = listOf(item)),
+                onShowSeenItems = { showSeenCount += 1 },
+            )
+        }
+
+        onNodeWithTag("feed-show-seen-button").performClick()
+
+        kotlin.test.assertEquals(1, showSeenCount)
+    }
+
+    @Test
+    fun `empty filtered source state can offer show seen items`() = runComposeUiTest {
+        setContent {
+            FeedScreen(
+                state = FeedShellUiState(
+                    sources = listOf(FeedSource(PlatformId.Rss, "rss-1", "rss-1")),
+                    selectedSourceId = "rss-1",
+                    selectedSourceKey = FeedSource(PlatformId.Rss, "rss-1", "rss-1"),
+                    items = emptyList(),
+                    includeSeen = false,
+                ),
+            )
+        }
+
+        onNodeWithText("Show seen items").assertExists()
+    }
+
+    @Test
     fun `feed screen shows relative timestamps`() = runComposeUiTest {
         val source = FeedSource(PlatformId.Rss, "rss-1", "rss-1")
         val item = feedItem(
@@ -205,6 +245,42 @@ class FeedScreenTest {
 
         kotlin.test.assertEquals("https://example.com/post/comments", openedUrl)
     }
+
+    @Test
+    fun `seen items sort to the bottom when included`() = runComposeUiTest {
+        val source = FeedSource(PlatformId.Rss, "rss-1", "rss-1")
+        val seenItem = feedItem(
+            itemId = "seen",
+            source = source,
+            publishedAtEpochMillis = 1L,
+            title = "Seen item",
+            seenState = SeenState.Seen,
+        )
+        val unseenItem = feedItem(
+            itemId = "unseen",
+            source = source,
+            publishedAtEpochMillis = 2L,
+            title = "Unseen item",
+            seenState = SeenState.Unseen,
+        )
+
+        setContent {
+            FeedScreen(
+                state = FeedShellUiState(
+                    sources = listOf(source),
+                    items = listOf(seenItem, unseenItem),
+                    includeSeen = true,
+                ),
+            )
+        }
+
+        val unseenY = onNodeWithText("Unseen item").fetchSemanticsNode().positionInRoot.y
+        val seenY = onNodeWithText("Seen item").fetchSemanticsNode().positionInRoot.y
+
+        check(unseenY < seenY) {
+            "Expected unseen items above seen items, but positions were $unseenY and $seenY."
+        }
+    }
 }
 
 private fun fakeState(
@@ -230,6 +306,7 @@ private fun feedItem(
     body: String? = null,
     permalink: String? = null,
     commentsPermalink: String? = null,
+    seenState: SeenState = SeenState.Unseen,
 ): FeedItem = FeedItem(
     itemId = itemId,
     platformId = source.platformId,
@@ -240,5 +317,5 @@ private fun feedItem(
     permalink = permalink,
     commentsPermalink = commentsPermalink,
     publishedAtEpochMillis = publishedAtEpochMillis,
-    seenState = SeenState.Unseen,
+    seenState = seenState,
 )

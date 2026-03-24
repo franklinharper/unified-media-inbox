@@ -42,9 +42,11 @@ class FeedShellState(
                     selectedSourceKey = resolvedSource,
                 )
             }
+            val includeSeen = _uiState.value.includeSeen
             val result = feedRepository.loadFeedItems(
                 FeedRequest(
                     sources = configuredSources,
+                    includeSeen = includeSeen,
                 ),
             )
             _uiState.update { current ->
@@ -64,6 +66,11 @@ class FeedShellState(
                 )
             }
         }
+    }
+
+    suspend fun showSeenItems() {
+        _uiState.update { it.copy(includeSeen = true) }
+        refresh()
     }
 
     fun selectFeedSource(source: FeedSource?) {
@@ -110,6 +117,7 @@ data class FeedShellUiState(
     val selectedSourceId: String? = null,
     internal val selectedSourceKey: FeedSource? = null,
     val items: List<FeedItem> = emptyList(),
+    val includeSeen: Boolean = false,
     val isLoading: Boolean = false,
     val loadError: ClientError? = null,
 ) {
@@ -118,6 +126,9 @@ data class FeedShellUiState(
             null -> items
             else -> items.filter { it.source == source }
         }
+
+    val canShowSeenItems: Boolean
+        get() = sources.isNotEmpty() && !includeSeen
 
     val emptyState: VisibleFeedEmptyState?
         get() = when {

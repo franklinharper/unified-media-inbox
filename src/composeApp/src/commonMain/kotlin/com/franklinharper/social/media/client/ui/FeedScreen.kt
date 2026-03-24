@@ -30,6 +30,7 @@ fun FeedScreen(
     onAddSourcesClick: () -> Unit = {},
     onSelectSource: (FeedSource?) -> Unit = {},
     onRefresh: () -> Unit = {},
+    onShowSeenItems: () -> Unit = {},
     onOpenItem: (FeedItem) -> Unit = {},
     onOpenComments: (String) -> Unit = {},
     nowEpochMillis: Long = Clock.System.now().toEpochMilliseconds(),
@@ -109,17 +110,27 @@ fun FeedScreen(
                             EmptyFeedState(
                                 title = "No items for this source",
                                 message = "Try another source or refresh again later.",
+                                actionLabel = if (state.canShowSeenItems) "Show seen items" else null,
+                                onActionClick = if (state.canShowSeenItems) onShowSeenItems else null,
                             )
                         }
 
                         null -> {
                             FeedItemList(
-                                items = state.visibleItems.sortedBy { it.publishedAtEpochMillis },
+                                items = sortFeedItemsForDisplay(state.visibleItems),
                                 isWideLayout = isWideLayout,
                                 nowEpochMillis = nowEpochMillis,
                                 onOpenItem = onOpenItem,
                                 onOpenComments = onOpenComments,
                             )
+                            if (state.canShowSeenItems) {
+                                Button(
+                                    onClick = onShowSeenItems,
+                                    modifier = Modifier.testTag("feed-show-seen-button"),
+                                ) {
+                                    Text("Show seen items")
+                                }
+                            }
                         }
                     }
                 }

@@ -75,6 +75,11 @@ fun App() {
                 onOpenAddSource = { addSourceState?.resetFlow() },
                 onBackFromAddSource = { addSourceState?.backToTypePicker() },
                 onOpenExternalUrl = { url -> uriHandler.openUri(url) },
+                onShowSeenItems = {
+                    scope.launch {
+                        feedShellState?.showSeenItems()
+                    }
+                },
                 onAddRssSource = { url ->
                     scope.launch {
                         addSourceState?.addRssSource(url)
@@ -115,6 +120,7 @@ internal fun AppRoot(
     onOpenAddSource: () -> Unit = {},
     onBackFromAddSource: () -> Unit = {},
     onOpenExternalUrl: (String) -> Unit = {},
+    onShowSeenItems: () -> Unit = {},
     onAddRssSource: (String) -> Unit = {},
     onAddBlueskySource: (String) -> Unit = {},
     onRefreshFeed: () -> Unit = {},
@@ -139,6 +145,7 @@ internal fun AppRoot(
             },
             onSelectSource = onSelectFeedSource,
             onRefresh = onRefreshFeed,
+            onShowSeenItems = onShowSeenItems,
             onOpenComments = onOpenExternalUrl,
             onOpenItem = { item ->
                 val externalUrl = item.externalOpenUrl()
@@ -182,6 +189,7 @@ internal fun AppRoot(
             },
             onSelectSource = onSelectFeedSource,
             onRefresh = onRefreshFeed,
+            onShowSeenItems = onShowSeenItems,
             onOpenComments = onOpenExternalUrl,
             onOpenItem = { item ->
                 val externalUrl = item.externalOpenUrl()

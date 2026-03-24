@@ -191,6 +191,29 @@ class FeedShellStateTest {
         assertNull(state.uiState.value.selectedSourceKey)
         assertEquals(VisibleFeedEmptyState.NoConfiguredSources, state.emptyState)
     }
+
+    @Test
+    fun `show seen items reloads feed with includeSeen enabled`() = runTest {
+        val source = FeedSource(PlatformId.Rss, "rss-1", "rss-1")
+        val fakeConfiguredSourceRepository = FakeConfiguredSourceRepository(
+            sources = listOf(ConfiguredSource.RssFeed(url = source.sourceId)),
+        )
+        val fakeFeedRepository = FakeFeedRepository(
+            result = FeedLoadResult(items = listOf(feedItem("item-1", source)), sourceStatuses = emptyList()),
+        )
+        val state = FeedShellState(
+            configuredSourceRepository = fakeConfiguredSourceRepository,
+            feedRepository = fakeFeedRepository,
+        )
+
+        state.start()
+        state.showSeenItems()
+
+        assertEquals(false, fakeFeedRepository.requests.first().includeSeen)
+        assertEquals(true, fakeFeedRepository.requests.last().includeSeen)
+        assertEquals(true, state.uiState.value.includeSeen)
+        assertEquals(false, state.uiState.value.canShowSeenItems)
+    }
 }
 
 private class FakeConfiguredSourceRepository(

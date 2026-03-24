@@ -55,6 +55,16 @@ fun FeedItemList(
     }
 }
 
+internal fun sortFeedItemsForDisplay(items: List<FeedItem>): List<FeedItem> =
+    items.sortedWith(
+        compareBy<FeedItem> {
+            when (it.seenState) {
+                com.franklinharper.social.media.client.domain.SeenState.Unseen -> 0
+                com.franklinharper.social.media.client.domain.SeenState.Seen -> 1
+            }
+        }.thenBy { it.publishedAtEpochMillis }
+    )
+
 internal fun formatRelativeTimestamp(
     nowEpochMillis: Long,
     publishedAtEpochMillis: Long,
