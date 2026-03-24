@@ -12,7 +12,9 @@ import com.franklinharper.social.media.client.domain.SeenState
 import com.franklinharper.social.media.client.repository.ConfiguredSourceRepository
 import com.franklinharper.social.media.client.repository.FeedRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.flow.update
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -141,6 +143,54 @@ class FeedShellStateTest {
         assertFalse(state.isLoading)
         assertNull(state.loadError)
     }
+
+    @Test
+    fun `selecting an unknown source id clears the selection`() = runTest {
+        val source = FeedSource(PlatformId.Rss, "rss-1", "rss-1")
+        val fakeConfiguredSourceRepository = FakeConfiguredSourceRepository(
+            sources = listOf(ConfiguredSource.RssFeed(url = source.sourceId)),
+        )
+        val fakeFeedRepository = FakeFeedRepository(
+            result = FeedLoadResult(items = listOf(feedItem("item-1", source)), sourceStatuses = emptyList()),
+        )
+        val state = FeedShellState(
+            configuredSourceRepository = fakeConfiguredSourceRepository,
+            feedRepository = fakeFeedRepository,
+        )
+
+        state.start()
+        state.selectSource("missing")
+
+        assertNull(state.uiState.value.selectedSourceId)
+        assertNull(state.uiState.value.selectedSourceKey)
+        assertEquals(listOf("item-1"), state.uiState.value.visibleItems.map { it.itemId })
+    }
+
+    @Test
+    fun `refresh clears the selection when the selected source disappears`() = runTest {
+        val source = FeedSource(PlatformId.Rss, "rss-1", "rss-1")
+        val fakeConfiguredSourceRepository = MutableConfiguredSourceRepository(
+            sources = listOf(ConfiguredSource.RssFeed(url = source.sourceId)),
+        )
+        val fakeFeedRepository = FakeFeedRepository(
+            result = FeedLoadResult(items = listOf(feedItem("item-1", source)), sourceStatuses = emptyList()),
+        )
+        val state = FeedShellState(
+            configuredSourceRepository = fakeConfiguredSourceRepository,
+            feedRepository = fakeFeedRepository,
+        )
+
+        state.start()
+        state.selectSource(source)
+        fakeConfiguredSourceRepository.sources = emptyList()
+        fakeFeedRepository.resultState.update { FeedLoadResult(items = emptyList(), sourceStatuses = emptyList()) }
+
+        state.refresh()
+
+        assertNull(state.uiState.value.selectedSourceId)
+        assertNull(state.uiState.value.selectedSourceKey)
+        assertEquals(VisibleFeedEmptyState.NoConfiguredSources, state.emptyState)
+    }
 }
 
 private class FakeConfiguredSourceRepository(
@@ -152,16 +202,26 @@ private class FakeConfiguredSourceRepository(
     override suspend fun clearAll() = error("Not used")
 }
 
+private class MutableConfiguredSourceRepository(
+    var sources: List<ConfiguredSource>,
+) : ConfiguredSourceRepository {
+    override suspend fun listSources(): List<ConfiguredSource> = sources
+    override suspend fun addSource(source: ConfiguredSource) = error("Not used")
+    override suspend fun removeSource(source: ConfiguredSource) = error("Not used")
+    override suspend fun clearAll() = error("Not used")
+}
+
 private class FakeFeedRepository(
-    private val result: FeedLoadResult = FeedLoadResult(items = emptyList(), sourceStatuses = emptyList()),
+    result: FeedLoadResult = FeedLoadResult(items = emptyList(), sourceStatuses = emptyList()),
     private val failure: Throwable? = null,
 ) : FeedRepository {
+    val resultState = MutableStateFlow(result)
     val requests = mutableListOf<FeedRequest>()
 
     override suspend fun loadFeedItems(request: FeedRequest): FeedLoadResult {
         requests += request
         failure?.let { throw it }
-        return result
+        return resultState.value
     }
 }
 

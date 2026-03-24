@@ -32,12 +32,14 @@ class FeedShellState(
             val configuredSources = configuredSourceRepository.listSources()
             val sources = configuredSources.map { it.toFeedSource() }
             _uiState.update { current ->
+                val resolvedSource = current.selectedSourceKey?.takeIf(sources::contains)
+                    ?: current.selectedSourceId?.let { sourceId ->
+                        sources.firstOrNull { it.sourceId == sourceId }
+                    }
                 current.copy(
                     sources = sources,
-                    selectedSourceKey = current.selectedSourceKey?.takeIf(sources::contains)
-                        ?: current.selectedSourceId?.let { sourceId ->
-                            sources.firstOrNull { it.sourceId == sourceId }
-                        },
+                    selectedSourceId = resolvedSource?.sourceId,
+                    selectedSourceKey = resolvedSource,
                 )
             }
             val result = feedRepository.loadFeedItems(
@@ -66,21 +68,23 @@ class FeedShellState(
 
     fun selectSource(source: FeedSource?) {
         _uiState.update { current ->
+            val resolvedSource = source?.takeIf(current.sources::contains)
             current.copy(
-                selectedSourceId = source?.sourceId,
-                selectedSourceKey = source?.takeIf(current.sources::contains),
+                selectedSourceId = resolvedSource?.sourceId,
+                selectedSourceKey = resolvedSource,
             )
         }
     }
 
     fun selectSource(sourceId: String?) {
         _uiState.update { current ->
+            val resolvedSource = sourceId?.let { id ->
+                current.selectedSourceKey?.takeIf { it.sourceId == id && current.sources.contains(it) }
+                    ?: current.sources.firstOrNull { it.sourceId == id }
+            }
             current.copy(
-                selectedSourceId = sourceId,
-                selectedSourceKey = sourceId?.let { id ->
-                    current.selectedSourceKey?.takeIf { it.sourceId == id && current.sources.contains(it) }
-                        ?: current.sources.firstOrNull { it.sourceId == id }
-                },
+                selectedSourceId = resolvedSource?.sourceId,
+                selectedSourceKey = resolvedSource,
             )
         }
     }
