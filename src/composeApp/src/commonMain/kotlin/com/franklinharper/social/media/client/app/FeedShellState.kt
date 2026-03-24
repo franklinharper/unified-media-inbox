@@ -66,7 +66,7 @@ class FeedShellState(
         }
     }
 
-    fun selectSource(source: FeedSource?) {
+    internal fun selectResolvedSource(source: FeedSource?) {
         _uiState.update { current ->
             val resolvedSource = source?.takeIf(current.sources::contains)
             current.copy(
