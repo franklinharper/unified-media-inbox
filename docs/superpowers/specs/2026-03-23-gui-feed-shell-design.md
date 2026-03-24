@@ -119,9 +119,15 @@ The “no sources yet” empty state must be distinct from “this source has no
 
 ## Repository Wiring
 
-The desktop GUI should use the same local persistence-backed shared repositories as the CLI rather than an in-memory or demo-only wiring path.
+The GUI target is the full Compose surface across Android, iOS, desktop, and web.
 
-This means the first GUI cut should exercise real configured-source persistence, feed cache persistence, seen-state persistence, and the same shared repository orchestration that already exists for the CLI surface.
+All GUI targets should use the shared repositories and shared domain boundary rather than introducing UI-specific feed orchestration.
+
+Desktop should use the same local persistence-backed shared repository approach as the CLI rather than an in-memory or demo-only wiring path.
+
+Android, iOS, and web should follow the same shared repository contracts, with platform-appropriate bootstrap and persistence implementations where required.
+
+This means the GUI rollout should exercise real configured-source persistence, feed cache persistence, seen-state persistence, and the same shared repository orchestration already established in `shared`, while allowing each target to supply the platform-specific repository wiring it needs.
 
 ## Initial Screen Set
 
@@ -160,7 +166,9 @@ The implementation plan should cover tests for:
 
 ## Planning Decisions Captured
 
+- The GUI is a cross-platform Compose surface for Android, iOS, desktop, and web
 - Desktop Compose uses the same persistence-backed shared repositories as the CLI
+- Other GUI targets use the same shared repositories with platform-specific bootstrap and persistence adapters where needed
 - RSS and Bluesky add-source flows are fully functional in the first GUI cut
 - Twitter add flow is deferred
 - Feed loading happens automatically on screen entry, with manual refresh also available
