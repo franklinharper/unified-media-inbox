@@ -87,6 +87,12 @@ The source-type picker should offer at least:
 
 After the user selects a source type, the flow advances to source-specific input for the required details.
 
+For the first implementation cut:
+
+- RSS add flows should be fully functional
+- Bluesky add flows should be fully functional
+- Twitter may appear as deferred or unavailable, but it is not required to be functional in this batch
+
 Management of existing sources can remain a secondary capability behind this dedicated area, but the primary entry path should optimize for adding the next source rather than browsing current ones.
 
 ## State Model
@@ -111,6 +117,12 @@ The “no sources yet” empty state must be distinct from “this source has no
 - Any reusable feed-loading or filtering policy that belongs across surfaces should remain in `shared`
 - The GUI should preserve ADR 0001 and ADR 0002 by treating the shared module as the application boundary
 
+## Repository Wiring
+
+The desktop GUI should use the same local persistence-backed shared repositories as the CLI rather than an in-memory or demo-only wiring path.
+
+This means the first GUI cut should exercise real configured-source persistence, feed cache persistence, seen-state persistence, and the same shared repository orchestration that already exists for the CLI surface.
+
 ## Initial Screen Set
 
 The first GUI cut should include:
@@ -118,6 +130,19 @@ The first GUI cut should include:
 1. Feed screen
 2. Add-source type picker
 3. Source-specific add flows or forms for supported source types
+
+Supported functional source types in the first cut:
+
+- RSS
+- Bluesky
+
+Twitter support can be added later without blocking the first GUI shell.
+
+## Refresh Behavior
+
+The feed screen should automatically load or refresh when it opens.
+
+After the initial automatic load, the GUI should also expose an explicit user-triggered refresh action so users can request a new fetch without leaving the screen.
 
 This first cut does not require a complex separate management dashboard embedded in the shell.
 
@@ -133,8 +158,9 @@ The implementation plan should cover tests for:
 - distinction between “no sources configured” and “no items for selected source”
 - reliance on shared repositories rather than direct concrete-client wiring in Compose UI
 
-## Open Questions For Planning
+## Planning Decisions Captured
 
-- How the Compose layer will obtain shared repository instances on each target
-- Whether source-specific add flows in the first cut are fully functional or partially scaffolded
-- Whether refresh is automatic on screen entry, explicit by user action, or both
+- Desktop Compose uses the same persistence-backed shared repositories as the CLI
+- RSS and Bluesky add-source flows are fully functional in the first GUI cut
+- Twitter add flow is deferred
+- Feed loading happens automatically on screen entry, with manual refresh also available
