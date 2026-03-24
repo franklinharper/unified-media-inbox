@@ -8,10 +8,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.franklinharper.social.media.client.app.FeedShellUiState
 import com.franklinharper.social.media.client.app.VisibleFeedEmptyState
@@ -26,6 +28,14 @@ fun FeedScreen(
 ) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = onAddSourcesClick,
+                modifier = Modifier.testTag("feed-add-source-fab"),
+            ) {
+                Text("+")
+            }
+        },
     ) { innerPadding ->
         BoxWithConstraints {
             val selectedSource = state.sources.firstOrNull { it.sourceId == state.selectedSourceId }

@@ -6,16 +6,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.tooling.preview.Preview
+import com.franklinharper.social.media.client.app.AddSourceState
+import com.franklinharper.social.media.client.app.AddSourceUiState
 import com.franklinharper.social.media.client.app.FeedShellState
 import com.franklinharper.social.media.client.app.FeedShellUiState
 import com.franklinharper.social.media.client.app.PlaceholderAppContainer
 import com.franklinharper.social.media.client.app.ResponsiveLayout
+import com.franklinharper.social.media.client.app.SourceType
 import com.franklinharper.social.media.client.app.createAppContainer
 import com.franklinharper.social.media.client.app.isWide
+import com.franklinharper.social.media.client.ui.AddSourceScreen
 import com.franklinharper.social.media.client.ui.FeedScreen
+import kotlinx.coroutines.launch
 
 @Composable
 @Preview
@@ -36,16 +45,74 @@ fun App() {
             }
             val placeholderState by rememberUpdatedState(FeedShellUiState())
             val uiState by feedShellState?.uiState?.collectAsState() ?: rememberUpdatedState(placeholderState)
+            val addSourceState = remember(container) {
+                if (container === PlaceholderAppContainer) {
+                    null
+                } else {
+                    AddSourceState(
+                        configuredSourceRepository = container.configuredSourceRepository,
+                    )
+                }
+            }
+            val placeholderAddSourceState by rememberUpdatedState(AddSourceUiState())
+            val addSourceUiState by addSourceState?.uiState?.collectAsState() ?: rememberUpdatedState(placeholderAddSourceState)
+            val scope = rememberCoroutineScope()
 
             LaunchedEffect(feedShellState) {
                 feedShellState?.start()
             }
 
-            FeedScreen(
-                state = uiState,
+            AppRoot(
+                feedState = uiState,
+                addSourceState = addSourceUiState,
                 isWideLayout = layout.isWide,
-                onSelectSource = { source -> feedShellState?.selectFeedSource(source) },
+                onSelectFeedSource = { source -> feedShellState?.selectFeedSource(source) },
+                onSelectAddSourceType = { type -> addSourceState?.selectType(type) },
+                onAddRssSource = { url ->
+                    scope.launch {
+                        addSourceState?.addRssSource(url)
+                    }
+                },
+                onAddBlueskySource = { handle ->
+                    scope.launch {
+                        addSourceState?.addBlueskySource(handle)
+                    }
+                },
             )
         }
     }
+}
+
+@Composable
+internal fun AppRoot(
+    feedState: FeedShellUiState,
+    addSourceState: AddSourceUiState,
+    isWideLayout: Boolean = false,
+    onSelectFeedSource: (com.franklinharper.social.media.client.domain.FeedSource?) -> Unit = {},
+    onSelectAddSourceType: (SourceType) -> Unit = {},
+    onAddRssSource: (String) -> Unit = {},
+    onAddBlueskySource: (String) -> Unit = {},
+) {
+    var screen by rememberSaveable { mutableStateOf(AppScreen.Feed) }
+
+    when (screen) {
+        AppScreen.Feed -> FeedScreen(
+            state = feedState,
+            isWideLayout = isWideLayout,
+            onAddSourcesClick = { screen = AppScreen.AddSource },
+            onSelectSource = onSelectFeedSource,
+        )
+
+        AppScreen.AddSource -> AddSourceScreen(
+            state = addSourceState,
+            onSelectType = onSelectAddSourceType,
+            onAddRssSource = onAddRssSource,
+            onAddBlueskySource = onAddBlueskySource,
+        )
+    }
+}
+
+private enum class AppScreen {
+    Feed,
+    AddSource,
 }
