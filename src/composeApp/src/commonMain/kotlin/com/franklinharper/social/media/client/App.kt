@@ -44,6 +44,7 @@ fun App() {
             FeedScreen(
                 state = uiState,
                 isWideLayout = layout.isWide,
+                onSelectSource = { source -> feedShellState?.selectFeedSource(source) },
             )
         }
     }
