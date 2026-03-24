@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,6 +26,7 @@ fun FeedScreen(
     isWideLayout: Boolean = false,
     onAddSourcesClick: () -> Unit = {},
     onSelectSource: (FeedSource?) -> Unit = {},
+    onRefresh: () -> Unit = {},
 ) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -66,7 +68,17 @@ fun FeedScreen(
                     modifier = Modifier.width(contentWidth),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    Text("Feed")
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text("Feed")
+                        IconButton(
+                            onClick = onRefresh,
+                            modifier = Modifier.testTag("feed-refresh-button"),
+                        ) {
+                            Text("Refresh")
+                        }
+                    }
 
                     if (!isWideLayout && state.sources.isNotEmpty()) {
                         SourceFilterDropdown(

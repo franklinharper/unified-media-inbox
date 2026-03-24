@@ -78,6 +78,11 @@ fun App() {
                         addSourceState?.addBlueskySource(handle)
                     }
                 },
+                onRefreshFeed = {
+                    scope.launch {
+                        feedShellState?.refresh()
+                    }
+                },
             )
         }
     }
@@ -92,6 +97,7 @@ internal fun AppRoot(
     onSelectAddSourceType: (SourceType) -> Unit = {},
     onAddRssSource: (String) -> Unit = {},
     onAddBlueskySource: (String) -> Unit = {},
+    onRefreshFeed: () -> Unit = {},
 ) {
     var screen by rememberSaveable { mutableStateOf(AppScreen.Feed) }
 
@@ -101,6 +107,7 @@ internal fun AppRoot(
             isWideLayout = isWideLayout,
             onAddSourcesClick = { screen = AppScreen.AddSource },
             onSelectSource = onSelectFeedSource,
+            onRefresh = onRefreshFeed,
         )
 
         AppScreen.AddSource -> AddSourceScreen(

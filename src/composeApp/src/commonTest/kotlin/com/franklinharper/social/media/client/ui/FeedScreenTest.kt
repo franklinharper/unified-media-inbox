@@ -90,6 +90,21 @@ class FeedScreenTest {
 
         assertContentEquals(listOf("user-1"), selectedSources)
     }
+
+    @Test
+    fun `refresh button emits refresh action`() = runComposeUiTest {
+        var refreshCount = 0
+        setContent {
+            FeedScreen(
+                state = fakeState(),
+                onRefresh = { refreshCount += 1 },
+            )
+        }
+
+        onNodeWithTag("feed-refresh-button").performClick()
+
+        kotlin.test.assertEquals(1, refreshCount)
+    }
 }
 
 private fun fakeState(
