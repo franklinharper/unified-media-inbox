@@ -69,7 +69,28 @@ internal fun createJvmAppContainer(
     }
 }
 
-private fun defaultDatabaseFile(): File = File(System.getProperty("user.dir"), "social-media-client.db")
+internal fun defaultDatabaseFile(
+    osName: String = System.getProperty("os.name"),
+    userHome: String = System.getProperty("user.home"),
+    environment: Map<String, String> = System.getenv(),
+): File = File(defaultDatabaseDirectory(osName, userHome, environment), "social-media-client.db")
+
+private fun defaultDatabaseDirectory(
+    osName: String,
+    userHome: String,
+    environment: Map<String, String>,
+): File = when {
+    osName.contains("Mac", ignoreCase = true) ->
+        File(userHome, "Library/Application Support/Social Media Client")
+
+    osName.contains("Windows", ignoreCase = true) ->
+        environment["APPDATA"]?.takeIf(String::isNotBlank)?.let { File(it, "Social Media Client") }
+            ?: File(userHome, "AppData/Roaming/Social Media Client")
+
+    else ->
+        environment["XDG_DATA_HOME"]?.takeIf(String::isNotBlank)?.let { File(it, "Social Media Client") }
+            ?: File(userHome, ".local/share/Social Media Client")
+}
 
 private fun twitterSessionFromEnvironment(): AccountSession? {
     val token = sequenceOf("X_BEARER_TOKEN", "TWITTER_BEARER_TOKEN")
