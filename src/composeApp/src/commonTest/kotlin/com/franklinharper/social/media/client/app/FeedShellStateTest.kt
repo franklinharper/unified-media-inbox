@@ -75,7 +75,7 @@ class FeedShellStateTest {
         )
 
         state.start()
-        state.selectResolvedSource(blueskySource)
+        state.selectFeedSource(blueskySource)
 
         assertEquals(blueskySource.sourceId, state.uiState.value.selectedSourceId)
         assertEquals(blueskySource, state.uiState.value.selectedSourceKey)
@@ -97,7 +97,7 @@ class FeedShellStateTest {
         )
 
         state.start()
-        state.selectResolvedSource(selectedSource)
+        state.selectFeedSource(selectedSource)
 
         assertEquals(listOf(selectedSource), state.sources)
         assertEquals(VisibleFeedEmptyState.NoItemsForSelectedSource(selectedSource.sourceId), state.emptyState)
@@ -181,7 +181,7 @@ class FeedShellStateTest {
         )
 
         state.start()
-        state.selectResolvedSource(source)
+        state.selectFeedSource(source)
         fakeConfiguredSourceRepository.sources = emptyList()
         fakeFeedRepository.resultState.update { FeedLoadResult(items = emptyList(), sourceStatuses = emptyList()) }
 
