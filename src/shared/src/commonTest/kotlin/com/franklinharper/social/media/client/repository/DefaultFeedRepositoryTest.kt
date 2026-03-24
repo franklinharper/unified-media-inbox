@@ -1,8 +1,11 @@
 package com.franklinharper.social.media.client.repository
 
 import com.franklinharper.social.media.client.client.ClientRegistry
+import com.franklinharper.social.media.client.client.SocialPlatformClient
 import com.franklinharper.social.media.client.client.fake.FakeBlueskyClient
 import com.franklinharper.social.media.client.client.fake.FakeRssClient
+import com.franklinharper.social.media.client.domain.FeedPage
+import com.franklinharper.social.media.client.domain.FeedQuery
 import com.franklinharper.social.media.client.domain.ClientError
 import com.franklinharper.social.media.client.domain.ConfiguredSource
 import com.franklinharper.social.media.client.domain.FeedItem
@@ -10,6 +13,7 @@ import com.franklinharper.social.media.client.domain.FeedRequest
 import com.franklinharper.social.media.client.domain.FeedSource
 import com.franklinharper.social.media.client.domain.PlatformId
 import com.franklinharper.social.media.client.domain.SeenState
+import com.franklinharper.social.media.client.domain.SessionState
 import com.franklinharper.social.media.client.domain.SourceContentOrigin
 import com.franklinharper.social.media.client.domain.SourceErrorLogEntry
 import kotlinx.coroutines.runBlocking
@@ -212,6 +216,58 @@ class DefaultFeedRepositoryTest {
 
             assertEquals(listOf("rss-1"), cacheRepository.readItems(source, includeSeen = true).map(FeedItem::itemId))
             assertEquals(999L, cacheRepository.getSyncState(source)?.lastRefreshedAtEpochMillis)
+        }
+    }
+
+    @Test
+    fun `loadFeedItems batches twitter follows into one client request and splits cache per source`() {
+        runBlocking {
+            val frankSource = FeedSource(PlatformId.Twitter, "frank", "frank")
+            val samSource = FeedSource(PlatformId.Twitter, "@sam", "@sam")
+            val cacheRepository = InMemoryFeedCacheRepository()
+            val seenRepository = InMemorySeenItemRepository()
+            val queries = mutableListOf<FeedQuery.SocialUsers>()
+            val twitterClient = object : SocialPlatformClient {
+                override val id: PlatformId = PlatformId.Twitter
+                override val displayName: String = "Twitter"
+
+                override suspend fun sessionState(): SessionState = SessionState.SignedOut
+
+                override suspend fun loadProfile(accountId: String) =
+                    error("Not used in this test")
+
+                override suspend fun loadFeed(query: FeedQuery, cursor: com.franklinharper.social.media.client.domain.FeedCursor?): FeedPage {
+                    val socialQuery = query as FeedQuery.SocialUsers
+                    queries += socialQuery
+                    return FeedPage(
+                        items = listOf(
+                            feedItem("tw-1", PlatformId.Twitter, frankSource, 100L),
+                            feedItem("tw-2", PlatformId.Twitter, samSource, 200L),
+                        ),
+                    )
+                }
+            }
+            val repository = DefaultFeedRepository(
+                clientRegistry = ClientRegistry(listOf(twitterClient)),
+                seenItemRepository = seenRepository,
+                feedCacheRepository = cacheRepository,
+                clock = { 999L },
+            )
+
+            val result = repository.loadFeedItems(
+                FeedRequest(
+                    sources = listOf(
+                        ConfiguredSource.SocialUser(platformId = PlatformId.Twitter, user = frankSource.sourceId),
+                        ConfiguredSource.SocialUser(platformId = PlatformId.Twitter, user = samSource.sourceId),
+                    ),
+                ),
+            )
+
+            assertEquals(1, queries.size)
+            assertEquals(listOf("frank", "@sam"), queries.single().users)
+            assertEquals(listOf("tw-2", "tw-1"), result.items.map(FeedItem::itemId))
+            assertEquals(listOf("tw-1"), cacheRepository.readItems(frankSource, includeSeen = true).map(FeedItem::itemId))
+            assertEquals(listOf("tw-2"), cacheRepository.readItems(samSource, includeSeen = true).map(FeedItem::itemId))
         }
     }
 

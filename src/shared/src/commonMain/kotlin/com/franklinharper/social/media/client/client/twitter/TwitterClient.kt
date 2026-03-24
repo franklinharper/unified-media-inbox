@@ -28,9 +28,9 @@ private val twitterJson = Json {
 
 class TwitterClient(
     private val sessionProvider: suspend () -> AccountSession? = { null },
-    private val fetchRecentTweets: suspend (String, String?, String) -> NetworkResponse = { handle, cursor, bearerToken ->
+    private val fetchRecentTweets: suspend (List<String>, String?, String) -> NetworkResponse = { handles, cursor, bearerToken ->
         NetworkHttp.get(
-            url = buildRecentTweetsUrl(handle, cursor),
+            url = buildRecentTweetsUrl(handles, cursor),
             headers = mapOf("Authorization" to "Bearer $bearerToken"),
         )
     },
@@ -72,46 +72,51 @@ class TwitterClient(
         val socialQuery = query as? FeedQuery.SocialUsers
             ?: throw TwitterClientException(ClientError.PermanentFailure("TwitterClient requires SocialUsers query"))
         val bearerToken = requireAccessToken()
-        val pages = socialQuery.users.map { user ->
-            val handle = normalizeHandle(user)
-            val response = try {
-                fetchRecentTweets(handle, cursor?.value ?: socialQuery.cursor?.value, bearerToken).bodyOrThrow()
-            } catch (error: Throwable) {
-                throw error.asTwitterException(defaultMessage = "Unable to load Twitter feed")
-            }
-            try {
-                twitterJson.decodeFromString<SearchRecentTweetsResponse>(response)
-            } catch (error: Throwable) {
-                throw error.asTwitterParsingException()
-            } to user
+        val requestedUsersByNormalizedHandle = socialQuery.users.associateBy(::normalizedHandleKey)
+        val response = try {
+            fetchRecentTweets(socialQuery.users, cursor?.value ?: socialQuery.cursor?.value, bearerToken).bodyOrThrow()
+        } catch (error: Throwable) {
+            throw error.asTwitterException(defaultMessage = "Unable to load Twitter feed")
+        }
+        val page = try {
+            twitterJson.decodeFromString<SearchRecentTweetsResponse>(response)
+        } catch (error: Throwable) {
+            throw error.asTwitterParsingException()
         }
 
-        val items = pages.flatMap { (page, sourceUser) ->
-            val usersById = page.includes?.users.orEmpty().associateBy(TwitterUser::id)
-            page.data.orEmpty().map { tweet ->
-                tweet.toFeedItem(
-                    sourceUser = sourceUser,
-                    author = usersById[tweet.authorId],
-                )
-            }
+        val usersById = page.includes?.users.orEmpty().associateBy(TwitterUser::id)
+        val items = page.data.orEmpty().mapNotNull { tweet ->
+            val author = usersById[tweet.authorId]
+            val sourceUser = author?.username
+                ?.let(::normalizedHandleKey)
+                ?.let(requestedUsersByNormalizedHandle::get)
+                ?: return@mapNotNull null
+            tweet.toFeedItem(
+                sourceUser = sourceUser,
+                author = author,
+            )
         }.sortedByDescending(FeedItem::publishedAtEpochMillis)
 
-        val nextCursor = if (pages.size == 1) {
-            pages.single().first.meta?.nextToken?.let(::FeedCursor)
-        } else {
-            null
-        }
-        return FeedPage(items = items, nextCursor = nextCursor)
+        return FeedPage(items = items, nextCursor = page.meta?.nextToken?.let(::FeedCursor))
     }
 
     private suspend fun requireAccessToken(): String =
         sessionProvider()?.accessToken?.takeIf(String::isNotBlank)
             ?: throw TwitterClientException(ClientError.AuthenticationError("Missing bearer token"))
     private companion object {
-        fun buildRecentTweetsUrl(handle: String, cursor: String?): String = buildString {
+        fun buildRecentTweetsUrl(handles: List<String>, cursor: String?): String = buildString {
+            val normalizedHandles = handles.map(::normalizeHandle).distinct()
+            val query = buildString {
+                if (normalizedHandles.size > 1) append('(')
+                append(normalizedHandles.joinToString(" OR ") { handle -> "from:$handle" })
+                if (normalizedHandles.size > 1) append(')')
+                append(" -is:retweet")
+            }
+            val maxResults = (normalizedHandles.size * 10).coerceIn(10, 100)
             append("https://api.x.com/2/tweets/search/recent?query=")
-            append("from:${normalizeHandle(handle)} -is:retweet".urlEncode())
-            append("&max_results=10")
+            append(query.urlEncode())
+            append("&max_results=")
+            append(maxResults)
             append("&tweet.fields=author_id,created_at,text")
             append("&expansions=author_id")
             append("&user.fields=name,username")
@@ -232,5 +237,6 @@ private fun parseTimestamp(value: String?): Long? =
     value?.let { runCatching { Instant.parse(it).toEpochMilliseconds() }.getOrNull() }
 
 private fun normalizeHandle(value: String): String = value.trim().removePrefix("@")
+private fun normalizedHandleKey(value: String): String = normalizeHandle(value).lowercase()
 
 private fun String.urlEncode(): String = encodeURLParameter()

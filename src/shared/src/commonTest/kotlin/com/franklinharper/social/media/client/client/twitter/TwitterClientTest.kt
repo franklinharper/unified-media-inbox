@@ -17,8 +17,8 @@ class TwitterClientTest {
     fun `loadFeed maps recent tweets into normalized feed items`() = runBlocking {
         val client = TwitterClient(
             sessionProvider = { AccountSession(accountId = "twitter-app", accessToken = "token") },
-            fetchRecentTweets = { handle, cursor, token ->
-                assertEquals("frank", handle)
+            fetchRecentTweets = { handles, cursor, token ->
+                assertEquals(listOf("@frank"), handles)
                 assertEquals(null, cursor)
                 assertEquals("token", token)
                 NetworkResponse(statusCode = 200, body = SEARCH_TWEETS_JSON, headers = emptyMap())
@@ -37,6 +37,28 @@ class TwitterClientTest {
         assertEquals("https://twitter.com/frank/status/12345", item.permalink)
         assertEquals("@frank", item.source.sourceId)
         assertEquals("next-1", page.nextCursor?.value)
+    }
+
+    @Test
+    fun `loadFeed batches multiple handles into one request`() = runBlocking {
+        var requestCount = 0
+        val client = TwitterClient(
+            sessionProvider = { AccountSession(accountId = "twitter-app", accessToken = "token") },
+            fetchRecentTweets = { handles, cursor, token ->
+                requestCount += 1
+                assertEquals(listOf("frank", "@sam"), handles)
+                assertEquals(null, cursor)
+                assertEquals("token", token)
+                NetworkResponse(statusCode = 200, body = BATCHED_SEARCH_TWEETS_JSON, headers = emptyMap())
+            },
+        )
+
+        val page = client.loadFeed(
+            FeedQuery.SocialUsers(platformId = PlatformId.Twitter, users = listOf("frank", "@sam")),
+        )
+
+        assertEquals(1, requestCount)
+        assertEquals(listOf("@sam", "frank"), page.items.map { it.source.sourceId })
     }
 
     @Test
@@ -128,6 +150,39 @@ class TwitterClientTest {
                 "id": "2244994945",
                 "name": "Frank Harper",
                 "username": "frank"
+              }
+            }
+        """
+
+        const val BATCHED_SEARCH_TWEETS_JSON = """
+            {
+              "data": [
+                {
+                  "id": "12345",
+                  "text": "Hello from Frank",
+                  "author_id": "2244994945",
+                  "created_at": "2026-03-20T10:15:30Z"
+                },
+                {
+                  "id": "67890",
+                  "text": "Hello from Sam",
+                  "author_id": "3344994945",
+                  "created_at": "2026-03-20T11:15:30Z"
+                }
+              ],
+              "includes": {
+                "users": [
+                  {
+                    "id": "2244994945",
+                    "name": "Frank Harper",
+                    "username": "frank"
+                  },
+                  {
+                    "id": "3344994945",
+                    "name": "Sam Taylor",
+                    "username": "sam"
+                  }
+                ]
               }
             }
         """

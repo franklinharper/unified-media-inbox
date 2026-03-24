@@ -26,11 +26,25 @@ class DefaultFeedRepository(
     private val clock: () -> Long = { 0L },
 ) : FeedRepository {
     override suspend fun loadFeedItems(request: FeedRequest): FeedLoadResult = coroutineScope {
-        val loadResults = request.sources.map { source ->
+        val twitterSourceIndexes = request.sources.withIndex().filter { indexedSource ->
+            indexedSource.value is ConfiguredSource.SocialUser && indexedSource.value.platformId == PlatformId.Twitter
+        }
+        val nonTwitterSourceIndexes = request.sources.withIndex().filterNot { indexedSource ->
+            indexedSource.value is ConfiguredSource.SocialUser && indexedSource.value.platformId == PlatformId.Twitter
+        }
+        val nonTwitterResults = nonTwitterSourceIndexes.map { indexedSource ->
             async {
-                loadSource(source, request.includeSeen)
+                indexedSource.index to loadSource(indexedSource.value, request.includeSeen)
             }
         }.awaitAll()
+        val twitterResults = if (twitterSourceIndexes.isEmpty()) {
+            emptyList()
+        } else {
+            loadTwitterSources(twitterSourceIndexes, request.includeSeen)
+        }
+        val loadResults = (nonTwitterResults + twitterResults)
+            .sortedBy(Pair<Int, SourceLoadResult>::first)
+            .map(Pair<Int, SourceLoadResult>::second)
 
         val mergedItems = loadResults
             .flatMap(SourceLoadResult::items)
@@ -45,6 +59,67 @@ class DefaultFeedRepository(
             items = mergedItems,
             sourceStatuses = loadResults.map(SourceLoadResult::status),
         )
+    }
+
+    private suspend fun loadTwitterSources(
+        sources: List<IndexedValue<ConfiguredSource>>,
+        includeSeen: Boolean,
+    ): List<Pair<Int, SourceLoadResult>> {
+        val twitterSources = sources.map { indexedSource ->
+            indexedSource.index to (indexedSource.value as ConfiguredSource.SocialUser)
+        }
+        val client = clientRegistry.require(PlatformId.Twitter)
+        val query = FeedQuery.SocialUsers(
+            platformId = PlatformId.Twitter,
+            users = twitterSources.map { (_, source) -> source.user },
+        )
+        val cachedItemsBySource = twitterSources.associate { (_, source) ->
+            source.toFeedSource() to feedCacheRepository?.readItems(source.toFeedSource(), includeSeen = true).orEmpty()
+        }
+        return try {
+            val page = client.loadFeed(query)
+            twitterSources.map { (index, source) ->
+                val feedSource = source.toFeedSource()
+                val sourceItems = page.items.filter { item -> item.source == feedSource }
+                feedCacheRepository?.replaceItems(
+                    source = feedSource,
+                    items = sourceItems,
+                    nextCursor = null,
+                    refreshedAtEpochMillis = clock(),
+                )
+                index to SourceLoadResult(
+                    items = sourceItems.filteredBySeen(includeSeen, seenItemRepository),
+                    status = FeedSourceStatus(
+                        source = feedSource,
+                        state = SourceLoadState.Success,
+                        contentOrigin = SourceContentOrigin.Refresh,
+                    ),
+                )
+            }
+        } catch (error: Throwable) {
+            val clientError = error.toClientError()
+            twitterSources.map { (index, source) ->
+                val feedSource = source.toFeedSource()
+                val filteredCachedItems = cachedItemsBySource[feedSource].orEmpty()
+                    .filteredBySeen(includeSeen, seenItemRepository)
+                val contentOrigin = if (filteredCachedItems.isEmpty()) SourceContentOrigin.None else SourceContentOrigin.Cache
+                sourceErrorRepository?.logError(
+                    source = feedSource,
+                    contentOrigin = contentOrigin,
+                    errorKind = clientError.kind,
+                    errorMessage = clientError.messageOrNull,
+                    occurredAtEpochMillis = clock(),
+                )
+                index to SourceLoadResult(
+                    items = filteredCachedItems,
+                    status = FeedSourceStatus(
+                        source = feedSource,
+                        state = SourceLoadState.Error(clientError),
+                        contentOrigin = contentOrigin,
+                    ),
+                )
+            }
+        }
     }
 
     private suspend fun loadSource(source: ConfiguredSource, includeSeen: Boolean): SourceLoadResult {
