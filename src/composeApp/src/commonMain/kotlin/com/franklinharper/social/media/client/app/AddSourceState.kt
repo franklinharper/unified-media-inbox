@@ -17,7 +17,7 @@ class AddSourceState(
     val uiState: StateFlow<AddSourceUiState> = _uiState.asStateFlow()
 
     fun selectType(type: SourceType) {
-        _uiState.update { it.copy(selectedType = type, addError = null) }
+        _uiState.update { it.copy(selectedType = type, addError = null, didAddSource = false) }
     }
 
     suspend fun addRssSource(url: String) {
@@ -35,15 +35,15 @@ class AddSourceState(
     }
 
     private suspend fun addSource(type: SourceType, source: ConfiguredSource) {
-        _uiState.update { it.copy(selectedType = type, isAdding = true, addError = null) }
+        _uiState.update { it.copy(selectedType = type, isAdding = true, addError = null, didAddSource = false) }
         try {
             configuredSourceRepository.addSource(source)
-            _uiState.update { it.copy(isAdding = false) }
+            _uiState.update { it.copy(selectedType = null, isAdding = false, didAddSource = true) }
         } catch (cancellation: CancellationException) {
             _uiState.update { it.copy(isAdding = false) }
             throw cancellation
         } catch (failure: Throwable) {
-            _uiState.update { it.copy(isAdding = false, addError = failure.message ?: "Unable to add source") }
+            _uiState.update { it.copy(isAdding = false, addError = failure.message ?: "Unable to add source", didAddSource = false) }
         }
     }
 }
@@ -52,6 +52,7 @@ data class AddSourceUiState(
     val selectedType: SourceType? = null,
     val isAdding: Boolean = false,
     val addError: String? = null,
+    val didAddSource: Boolean = false,
 )
 
 enum class SourceType {

@@ -25,9 +25,10 @@ class AddSourceStateTest {
         state.selectType(SourceType.Rss)
         state.addRssSource("https://hnrss.org/newest")
 
-        assertEquals(SourceType.Rss, state.uiState.value.selectedType)
         assertFalse(state.uiState.value.isAdding)
         assertNull(state.uiState.value.addError)
+        assertEquals(true, state.uiState.value.didAddSource)
+        assertEquals(null, state.uiState.value.selectedType)
         assertEquals(
             listOf<ConfiguredSource>(ConfiguredSource.RssFeed(url = "https://hnrss.org/newest")),
             fakeConfiguredSourceRepository.sources,
@@ -44,9 +45,10 @@ class AddSourceStateTest {
         state.selectType(SourceType.Bluesky)
         state.addBlueskySource("frank.bsky.social")
 
-        assertEquals(SourceType.Bluesky, state.uiState.value.selectedType)
         assertFalse(state.uiState.value.isAdding)
         assertNull(state.uiState.value.addError)
+        assertEquals(true, state.uiState.value.didAddSource)
+        assertEquals(null, state.uiState.value.selectedType)
         assertEquals(
             listOf<ConfiguredSource>(ConfiguredSource.SocialUser(PlatformId.Bluesky, "frank.bsky.social")),
             fakeConfiguredSourceRepository.sources,
@@ -66,6 +68,7 @@ class AddSourceStateTest {
 
         assertFalse(state.uiState.value.isAdding)
         assertEquals("duplicate", state.uiState.value.addError)
+        assertEquals(false, state.uiState.value.didAddSource)
     }
 
     @Test
@@ -80,6 +83,7 @@ class AddSourceStateTest {
             state.addBlueskySource("frank.bsky.social")
         }
         assertFalse(state.uiState.value.isAdding)
+        assertEquals(false, state.uiState.value.didAddSource)
     }
 
     @Test
@@ -105,6 +109,7 @@ class AddSourceStateTest {
         addJob.join()
 
         assertFalse(state.uiState.value.isAdding)
+        assertEquals(true, state.uiState.value.didAddSource)
         assertEquals(
             listOf<ConfiguredSource>(ConfiguredSource.RssFeed(url = "https://hnrss.org/newest")),
             repository.sources,

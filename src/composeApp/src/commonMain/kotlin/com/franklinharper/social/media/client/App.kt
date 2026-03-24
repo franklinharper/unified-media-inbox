@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -100,6 +101,13 @@ internal fun AppRoot(
     onRefreshFeed: () -> Unit = {},
 ) {
     var screen by rememberSaveable { mutableStateOf(AppScreen.Feed) }
+
+    LaunchedEffect(screen, addSourceState.didAddSource) {
+        if (screen == AppScreen.AddSource && addSourceState.didAddSource) {
+            screen = AppScreen.Feed
+            onRefreshFeed()
+        }
+    }
 
     when (screen) {
         AppScreen.Feed -> FeedScreen(
