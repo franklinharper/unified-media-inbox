@@ -125,7 +125,7 @@ During active development, iOS verification is deferred unless the current task 
 
 All GUI targets should use the shared repositories and shared domain boundary rather than introducing UI-specific feed orchestration.
 
-Desktop should use the same local persistence-backed shared repository approach as the CLI rather than an in-memory or demo-only wiring path.
+Desktop should use the same shared persistence-backed repository stack as the CLI rather than an in-memory or demo-only wiring path, but it should not copy the CLI's current-working-directory storage policy. The desktop app is a real end-user surface, so its persistence should live under a standard per-user application data location for the host OS.
 
 Android, iOS, and web should follow the same shared repository contracts, with platform-appropriate bootstrap and persistence implementations where required.
 

@@ -59,7 +59,7 @@
 - Create: `src/composeApp/src/iosMain/kotlin/com/franklinharper/social/media/client/app/AppContainerFactory.ios.kt`
   Responsibility: iOS repository/client/bootstrap wiring.
 - Create: `src/composeApp/src/jvmMain/kotlin/com/franklinharper/social/media/client/app/AppContainerFactory.jvm.kt`
-  Responsibility: desktop repository/client/bootstrap wiring using the same persistence-backed shared stack as CLI.
+  Responsibility: desktop repository/client/bootstrap wiring using the same shared persistence-backed stack as CLI, but stored in a standard per-user desktop app data location rather than the current working directory.
 - Create: `src/composeApp/src/webMain/kotlin/com/franklinharper/social/media/client/app/AppContainerFactory.web.kt`
   Responsibility: web repository/client/bootstrap wiring with platform-appropriate persistence or a clearly documented fallback if persistent storage support requires an incremental slice.
 - Create: `src/composeApp/src/wasmJsMain/kotlin/com/franklinharper/social/media/client/app/AppContainerFactory.wasmJs.kt`
@@ -507,7 +507,7 @@ git add src/composeApp/src/commonMain/kotlin/com/franklinharper/social/media/cli
 git commit -m "Add dedicated source creation flow"
 ```
 
-## Task 7: Add Desktop/JVM Bootstrap Using CLI-Equivalent Persistence
+## Task 7: Add Desktop/JVM Bootstrap Using Production Desktop Persistence
 
 **Files:**
 - Create: `src/composeApp/src/jvmMain/kotlin/com/franklinharper/social/media/client/app/AppContainerFactory.jvm.kt`
@@ -528,6 +528,13 @@ fun `jvm app container uses file backed shared repositories`() {
     assertNotNull(container.sourceErrorRepository)
     assertEquals(listOf(PlatformId.Rss, PlatformId.Bluesky, PlatformId.Twitter), container.clientRegistry.all().map { it.id })
 }
+
+@Test
+fun `default desktop database path uses standard app data location instead of cwd`() {
+    val databaseFile = defaultDesktopDatabaseFile(...)
+
+    assertFalse(databaseFile.startsWith(File(System.getProperty("user.dir"))))
+}
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -544,6 +551,8 @@ fun createJvmAppContainer(databasePath: File = defaultPath()): AppContainer {
     return DefaultAppContainer(...)
 }
 ```
+
+The default path helper should resolve to a standard per-user application data location for the host OS rather than `System.getProperty("user.dir")`.
 
 - [ ] **Step 4: Run test to verify it passes**
 
