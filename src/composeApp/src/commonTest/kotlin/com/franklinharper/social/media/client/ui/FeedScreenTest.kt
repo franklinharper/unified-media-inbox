@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
+import com.franklinharper.social.media.client.AppRoot
 import com.franklinharper.social.media.client.app.FeedShellUiState
 import com.franklinharper.social.media.client.domain.FeedItem
 import com.franklinharper.social.media.client.domain.FeedSource
@@ -98,12 +99,83 @@ class FeedScreenTest {
             FeedScreen(
                 state = fakeState(),
                 onRefresh = { refreshCount += 1 },
+                nowEpochMillis = 10_000L,
             )
         }
 
         onNodeWithTag("feed-refresh-button").performClick()
 
         kotlin.test.assertEquals(1, refreshCount)
+    }
+
+    @Test
+    fun `feed screen shows relative timestamps`() = runComposeUiTest {
+        val source = FeedSource(PlatformId.Rss, "rss-1", "rss-1")
+        val item = feedItem(
+            itemId = "item-1",
+            source = source,
+            publishedAtEpochMillis = 7_000L,
+            title = "Relative item",
+        )
+
+        setContent {
+            FeedScreen(
+                state = fakeState(items = listOf(item)),
+                nowEpochMillis = 10_000L,
+            )
+        }
+
+        onNodeWithText("00:00:03 ago").assertExists()
+    }
+
+    @Test
+    fun `clicking non-url item opens detail screen`() = runComposeUiTest {
+        val source = FeedSource(PlatformId.Rss, "rss-1", "rss-1")
+        val item = feedItem(
+            itemId = "item-1",
+            source = source,
+            publishedAtEpochMillis = 7_000L,
+            title = "Detail item",
+            body = "Full item body",
+        )
+
+        setContent {
+            AppRoot(
+                feedState = fakeState(items = listOf(item)),
+                addSourceState = com.franklinharper.social.media.client.app.AddSourceUiState(),
+            )
+        }
+
+        onNodeWithText("Detail item").performClick()
+
+        onNodeWithText("Full item body").assertExists()
+        onNodeWithTag("feed-item-detail-close").assertExists()
+    }
+
+    @Test
+    fun `clicking url item opens external browser instead of detail screen`() = runComposeUiTest {
+        val source = FeedSource(PlatformId.Rss, "rss-1", "rss-1")
+        val item = feedItem(
+            itemId = "item-1",
+            source = source,
+            publishedAtEpochMillis = 7_000L,
+            title = "Url item",
+            body = "https://example.com/post",
+        )
+        var openedUrl: String? = null
+
+        setContent {
+            AppRoot(
+                feedState = fakeState(items = listOf(item)),
+                addSourceState = com.franklinharper.social.media.client.app.AddSourceUiState(),
+                onOpenExternalUrl = { openedUrl = it },
+            )
+        }
+
+        onNodeWithText("Url item").performClick()
+
+        kotlin.test.assertEquals("https://example.com/post", openedUrl)
+        onNodeWithTag("feed-item-detail-close").assertDoesNotExist()
     }
 }
 
@@ -127,14 +199,16 @@ private fun feedItem(
     source: FeedSource,
     publishedAtEpochMillis: Long,
     title: String,
+    body: String? = null,
+    permalink: String? = null,
 ): FeedItem = FeedItem(
     itemId = itemId,
     platformId = source.platformId,
     source = source,
     authorName = null,
     title = title,
-    body = null,
-    permalink = null,
+    body = body,
+    permalink = permalink,
     publishedAtEpochMillis = publishedAtEpochMillis,
     seenState = SeenState.Unseen,
 )

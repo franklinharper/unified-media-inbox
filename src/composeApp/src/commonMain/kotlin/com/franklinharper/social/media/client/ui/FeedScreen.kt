@@ -3,13 +3,14 @@ package com.franklinharper.social.media.client.ui
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Button
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,7 +19,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.franklinharper.social.media.client.app.FeedShellUiState
 import com.franklinharper.social.media.client.app.VisibleFeedEmptyState
+import com.franklinharper.social.media.client.domain.FeedItem
 import com.franklinharper.social.media.client.domain.FeedSource
+import kotlin.time.Clock
 
 @Composable
 fun FeedScreen(
@@ -27,6 +30,8 @@ fun FeedScreen(
     onAddSourcesClick: () -> Unit = {},
     onSelectSource: (FeedSource?) -> Unit = {},
     onRefresh: () -> Unit = {},
+    onOpenItem: (FeedItem) -> Unit = {},
+    nowEpochMillis: Long = Clock.System.now().toEpochMilliseconds(),
 ) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -69,10 +74,11 @@ fun FeedScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text("Feed")
-                        IconButton(
+                        Button(
                             onClick = onRefresh,
                             modifier = Modifier.testTag("feed-refresh-button"),
                         ) {
@@ -109,6 +115,8 @@ fun FeedScreen(
                             FeedItemList(
                                 items = state.visibleItems.sortedBy { it.publishedAtEpochMillis },
                                 isWideLayout = isWideLayout,
+                                nowEpochMillis = nowEpochMillis,
+                                onOpenItem = onOpenItem,
                             )
                         }
                     }

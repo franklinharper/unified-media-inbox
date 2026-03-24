@@ -128,7 +128,7 @@ class AddSourceScreenTest {
 
         onNodeWithText("Add sources").performClick()
         onNodeWithText("RSS feed").performClick()
-        onNodeWithText("Back").performClick()
+        onNodeWithTag("add-source-close-button").performClick()
 
         onNodeWithText("Add a source").assertExists()
         onNodeWithText("RSS feed").assertExists()
@@ -158,7 +158,7 @@ class AddSourceScreenTest {
         }
 
         onNodeWithText("Add sources").performClick()
-        onNodeWithText("Close").performClick()
+        onNodeWithTag("add-source-close-button").performClick()
 
         onNodeWithText("Feed").assertExists()
         onNodeWithText("Add a source").assertDoesNotExist()
