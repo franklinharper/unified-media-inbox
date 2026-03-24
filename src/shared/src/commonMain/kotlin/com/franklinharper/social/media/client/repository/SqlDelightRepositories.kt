@@ -17,7 +17,7 @@ import com.franklinharper.social.media.client.domain.SourceErrorLogEntry
 
 class SqlDelightConfiguredSourceRepository(
     private val database: SocialMediaDatabase,
-    private val ownerUserId: String = DEFAULT_OWNER_USER_ID,
+    private val ownerUserId: String,
 ) : ConfiguredSourceRepository {
     private val queries = database.socialMediaDatabaseQueries
 
@@ -60,7 +60,7 @@ class SqlDelightConfiguredSourceRepository(
 
 class SqlDelightSeenItemRepository(
     private val database: SocialMediaDatabase,
-    private val ownerUserId: String = DEFAULT_OWNER_USER_ID,
+    private val ownerUserId: String,
     private val clock: () -> Long = { 0L },
 ) : SeenItemRepository {
     private val queries = database.socialMediaDatabaseQueries
@@ -139,7 +139,7 @@ class SqlDelightSessionRepository(
 
 class SqlDelightFeedCacheRepository(
     private val database: SocialMediaDatabase,
-    private val ownerUserId: String = DEFAULT_OWNER_USER_ID,
+    private val ownerUserId: String,
     private val clock: () -> Long = { 0L },
 ) : FeedCacheRepository {
     private val queries = database.socialMediaDatabaseQueries
@@ -243,7 +243,7 @@ class SqlDelightFeedCacheRepository(
 
 class SqlDelightSourceErrorRepository(
     private val database: SocialMediaDatabase,
-    private val ownerUserId: String = DEFAULT_OWNER_USER_ID,
+    private val ownerUserId: String,
 ) : SourceErrorRepository {
     private val queries = database.socialMediaDatabaseQueries
 
@@ -431,7 +431,7 @@ private val FeedItem.cacheKey: String
 private val PlatformId.serializedName: String
     get() = name.lowercase()
 
-private const val DEFAULT_OWNER_USER_ID = ""
+const val LOCAL_OWNER_USER_ID = ""
 
 private fun requireServerOwnerUserId(ownerUserId: String): String =
     ownerUserId.takeIf(String::isNotBlank) ?: error("Server-owned repositories require a non-blank user id")

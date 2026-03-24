@@ -19,6 +19,7 @@ import com.franklinharper.social.media.client.domain.SourceContentOrigin
 import com.franklinharper.social.media.client.domain.SourceLoadState
 import com.franklinharper.social.media.client.domain.extractRssFeedUrlsFromOpml
 import com.franklinharper.social.media.client.repository.DefaultFeedRepository
+import com.franklinharper.social.media.client.repository.LOCAL_OWNER_USER_ID
 import com.franklinharper.social.media.client.repository.SqlDelightConfiguredSourceRepository
 import com.franklinharper.social.media.client.repository.SqlDelightFeedCacheRepository
 import com.franklinharper.social.media.client.repository.SqlDelightSeenItemRepository
@@ -32,11 +33,11 @@ class DefaultCliApp(
     clientRegistry: ClientRegistry? = null,
 ) : CliApp {
     private val database = JvmDatabaseFactory.fileBacked(databasePath)
-    private val sourceRepository = SqlDelightConfiguredSourceRepository(database)
-    private val seenRepository = SqlDelightSeenItemRepository(database) { System.currentTimeMillis() }
+    private val sourceRepository = SqlDelightConfiguredSourceRepository(database, LOCAL_OWNER_USER_ID)
+    private val seenRepository = SqlDelightSeenItemRepository(database, LOCAL_OWNER_USER_ID) { System.currentTimeMillis() }
     private val sessionRepository = SqlDelightSessionRepository(database)
-    private val feedCacheRepository = SqlDelightFeedCacheRepository(database) { System.currentTimeMillis() }
-    private val sourceErrorRepository = SqlDelightSourceErrorRepository(database)
+    private val feedCacheRepository = SqlDelightFeedCacheRepository(database, LOCAL_OWNER_USER_ID) { System.currentTimeMillis() }
+    private val sourceErrorRepository = SqlDelightSourceErrorRepository(database, LOCAL_OWNER_USER_ID)
     private val resolvedClientRegistry = clientRegistry ?: ClientRegistry(
         listOf(
             RssClient(),
@@ -347,6 +348,7 @@ private fun Throwable.isSchemaMismatch(): Boolean =
         .mapNotNull(Throwable::message)
         .any { message ->
             message.contains("no such table", ignoreCase = true) ||
+                message.contains("no such column", ignoreCase = true) ||
                 message.contains("has no column named", ignoreCase = true) ||
                 message.contains("table", ignoreCase = true) && message.contains("has no", ignoreCase = true)
         }

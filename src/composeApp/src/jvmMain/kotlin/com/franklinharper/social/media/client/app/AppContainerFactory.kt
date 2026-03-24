@@ -9,6 +9,7 @@ import com.franklinharper.social.media.client.domain.AccountSession
 import com.franklinharper.social.media.client.domain.PlatformId
 import com.franklinharper.social.media.client.domain.SessionState
 import com.franklinharper.social.media.client.repository.DefaultFeedRepository
+import com.franklinharper.social.media.client.repository.LOCAL_OWNER_USER_ID
 import com.franklinharper.social.media.client.repository.SqlDelightConfiguredSourceRepository
 import com.franklinharper.social.media.client.repository.SqlDelightFeedCacheRepository
 import com.franklinharper.social.media.client.repository.SqlDelightSeenItemRepository
@@ -22,11 +23,11 @@ internal fun createJvmAppContainer(
     databaseFile: File = defaultDatabaseFile(),
 ): AppContainer {
     val database = JvmDatabaseFactory.fileBacked(databaseFile)
-    val configuredSourceRepository = SqlDelightConfiguredSourceRepository(database)
-    val seenItemRepository = SqlDelightSeenItemRepository(database) { System.currentTimeMillis() }
+    val configuredSourceRepository = SqlDelightConfiguredSourceRepository(database, LOCAL_OWNER_USER_ID)
+    val seenItemRepository = SqlDelightSeenItemRepository(database, LOCAL_OWNER_USER_ID) { System.currentTimeMillis() }
     val sessionRepository = SqlDelightSessionRepository(database)
-    val feedCacheRepository = SqlDelightFeedCacheRepository(database) { System.currentTimeMillis() }
-    val sourceErrorRepository = SqlDelightSourceErrorRepository(database)
+    val feedCacheRepository = SqlDelightFeedCacheRepository(database, LOCAL_OWNER_USER_ID) { System.currentTimeMillis() }
+    val sourceErrorRepository = SqlDelightSourceErrorRepository(database, LOCAL_OWNER_USER_ID)
     val clientRegistry = ClientRegistry(
         listOf(
             RssClient(),

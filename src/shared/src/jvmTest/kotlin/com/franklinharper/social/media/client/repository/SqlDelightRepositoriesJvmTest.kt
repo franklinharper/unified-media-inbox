@@ -22,7 +22,7 @@ class SqlDelightRepositoriesJvmTest {
     @Test
     fun `configured source repository persists and removes sources`() = withDatabase { database ->
         runBlocking {
-            val repository = SqlDelightConfiguredSourceRepository(database)
+            val repository = SqlDelightConfiguredSourceRepository(database, LOCAL_OWNER_USER_ID)
             val rssFeed = ConfiguredSource.RssFeed(url = "https://example.com/feed.xml")
             val socialUser = ConfiguredSource.SocialUser(PlatformId.Bluesky, "frank")
 
@@ -40,7 +40,7 @@ class SqlDelightRepositoriesJvmTest {
     @Test
     fun `seen item repository tracks seen state`() = withDatabase { database ->
         runBlocking {
-            val repository = SqlDelightSeenItemRepository(database) { 123L }
+            val repository = SqlDelightSeenItemRepository(database, LOCAL_OWNER_USER_ID) { 123L }
 
             assertEquals(false, repository.isSeen("rss:item-1"))
 
@@ -81,7 +81,7 @@ class SqlDelightRepositoriesJvmTest {
     @Test
     fun `feed cache repository stores items and sync state while filtering seen items`() = withDatabase { database ->
         runBlocking {
-            val repository = SqlDelightFeedCacheRepository(database) { 500L }
+            val repository = SqlDelightFeedCacheRepository(database, LOCAL_OWNER_USER_ID) { 500L }
             val source = FeedSource(
                 platformId = PlatformId.Rss,
                 sourceId = "https://example.com/feed.xml",
@@ -136,7 +136,7 @@ class SqlDelightRepositoriesJvmTest {
     @Test
     fun `source error repository stores and clears errors`() = withDatabase { database ->
         runBlocking {
-            val repository = SqlDelightSourceErrorRepository(database)
+            val repository = SqlDelightSourceErrorRepository(database, LOCAL_OWNER_USER_ID)
             val source = FeedSource(
                 platformId = PlatformId.Rss,
                 sourceId = "https://example.com/feed.xml",

@@ -8,6 +8,7 @@ import com.franklinharper.social.media.client.db.SocialMediaDatabase
 import com.franklinharper.social.media.client.domain.PlatformId
 import com.franklinharper.social.media.client.domain.SessionState
 import com.franklinharper.social.media.client.repository.DefaultFeedRepository
+import com.franklinharper.social.media.client.repository.LOCAL_OWNER_USER_ID
 import com.franklinharper.social.media.client.repository.SqlDelightConfiguredSourceRepository
 import com.franklinharper.social.media.client.repository.SqlDelightFeedCacheRepository
 import com.franklinharper.social.media.client.repository.SqlDelightSeenItemRepository
@@ -18,11 +19,11 @@ fun buildAppContainer(
     database: SocialMediaDatabase,
     clock: () -> Long,
 ): AppContainer {
-    val configuredSourceRepository = SqlDelightConfiguredSourceRepository(database)
+    val configuredSourceRepository = SqlDelightConfiguredSourceRepository(database, LOCAL_OWNER_USER_ID)
     val sessionRepository = SqlDelightSessionRepository(database)
-    val seenItemRepository = SqlDelightSeenItemRepository(database, clock = clock)
-    val feedCacheRepository = SqlDelightFeedCacheRepository(database, clock = clock)
-    val sourceErrorRepository = SqlDelightSourceErrorRepository(database)
+    val seenItemRepository = SqlDelightSeenItemRepository(database, LOCAL_OWNER_USER_ID, clock = clock)
+    val feedCacheRepository = SqlDelightFeedCacheRepository(database, LOCAL_OWNER_USER_ID, clock = clock)
+    val sourceErrorRepository = SqlDelightSourceErrorRepository(database, LOCAL_OWNER_USER_ID)
     val clientRegistry = ClientRegistry(
         listOf(
             RssClient(),
