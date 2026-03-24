@@ -121,6 +121,8 @@ The “no sources yet” empty state must be distinct from “this source has no
 
 The GUI target is the full Compose surface across Android, iOS, desktop, and web.
 
+During active development, iOS verification is deferred unless the current task is specifically about bringing up or debugging the iOS target. iOS remains part of the intended product surface, but routine implementation work should not block on running iOS compile or execution checks.
+
 All GUI targets should use the shared repositories and shared domain boundary rather than introducing UI-specific feed orchestration.
 
 Desktop should use the same local persistence-backed shared repository approach as the CLI rather than an in-memory or demo-only wiring path.
