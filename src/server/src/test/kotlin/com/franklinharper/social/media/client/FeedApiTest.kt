@@ -56,7 +56,7 @@ class FeedApiTest {
 
         assertEquals(HttpStatusCode.OK, response.status)
         val body = decodeFeed(response.bodyAsText())
-        assertEquals(listOf("rss-1"), body.items.map { it.itemId })
+        assertEquals(listOf("rss:rss-1"), body.items.map { it.itemId })
         assertEquals(emptyList(), feedItems(bobToken))
     }
 
@@ -85,9 +85,36 @@ class FeedApiTest {
 
         assertEquals(HttpStatusCode.OK, markSeenResponse.status)
         assertEquals(emptyList(), feedItems(aliceToken))
-        assertEquals(listOf("rss-1"), feedItems(bobToken))
+        assertEquals(listOf("rss:rss-1"), feedItems(bobToken))
         assertTrue(decodeFeed(getFeed(aliceToken, includeSeen = true).bodyAsText()).items.single().seen)
         assertFalse(decodeFeed(getFeed(bobToken, includeSeen = true).bodyAsText()).items.single().seen)
+    }
+
+    @Test
+    fun `feed seen accepts item ids returned by feed api`() = testApplication {
+        val database = ServerDatabaseFactory.inMemory()
+        val authService = createAuthService(database)
+        val token = authService.signIn("alice@example.com", "secret").token
+        application {
+            module(
+                authService = authService,
+                dependencies = createDependencies(database),
+            )
+        }
+        addSource(token, AddSourceRequest.rss("https://example.com/feed.xml"))
+        refreshFeed(token)
+
+        val itemId = decodeFeed(getFeed(token).bodyAsText()).items.single().itemId
+
+        val markSeenResponse = client.post("/api/feed/seen") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(json.encodeToString(MarkSeenRequest(itemIds = listOf(itemId))))
+        }
+
+        assertEquals(HttpStatusCode.OK, markSeenResponse.status)
+        assertEquals(emptyList(), feedItems(token))
+        assertTrue(decodeFeed(getFeed(token, includeSeen = true).bodyAsText()).items.single().seen)
     }
 
     private suspend fun ApplicationTestBuilder.addSource(token: String, request: AddSourceRequest) {

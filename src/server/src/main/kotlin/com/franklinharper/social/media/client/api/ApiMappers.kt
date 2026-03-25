@@ -19,14 +19,16 @@ fun ConfiguredSource.toSourceDto(): SourceDto = when (this) {
     )
 }
 
-fun SourceDto.toDomainSource(): ConfiguredSource = when (kind) {
+fun SourceDto.toDomainSourceOrNull(): ConfiguredSource? = when (kind) {
     "rss_feed" -> ConfiguredSource.RssFeed(url = value)
-    "social_user" -> ConfiguredSource.SocialUser(platformId = platformId.toPlatformId(), user = value)
-    else -> error("Unsupported source kind: $kind")
+    "social_user" -> platformId.toPlatformIdOrNull()?.let { platformId ->
+        ConfiguredSource.SocialUser(platformId = platformId, user = value)
+    }
+    else -> null
 }
 
-fun AddSourceRequest.toDomainSource(): ConfiguredSource =
-    SourceDto(platformId = platformId, kind = kind, value = value).toDomainSource()
+fun AddSourceRequest.toDomainSourceOrNull(): ConfiguredSource? =
+    SourceDto(platformId = platformId, kind = kind, value = value).toDomainSourceOrNull()
 
 fun FeedLoadResult.toFeedResponse(): FeedResponse =
     FeedResponse(
@@ -36,7 +38,7 @@ fun FeedLoadResult.toFeedResponse(): FeedResponse =
 
 private fun FeedItem.toDto(): FeedItemDto =
     FeedItemDto(
-        itemId = itemId,
+        itemId = cacheKey,
         platformId = platformId.serializedName,
         source = source.toDto(),
         authorName = authorName,
@@ -73,11 +75,11 @@ private fun FeedSourceStatus.toDto(): FeedSourceStatusDto {
 private val PlatformId.serializedName: String
     get() = name.lowercase()
 
-private fun String.toPlatformId(): PlatformId = when (lowercase()) {
+private fun String.toPlatformIdOrNull(): PlatformId? = when (lowercase()) {
     "rss" -> PlatformId.Rss
     "bluesky" -> PlatformId.Bluesky
     "twitter" -> PlatformId.Twitter
-    else -> error("Unsupported platform id: $this")
+    else -> null
 }
 
 private val ClientError.kind: String
@@ -99,3 +101,6 @@ private val ClientError.message: String?
         is ClientError.TemporaryFailure -> message
         is ClientError.PermanentFailure -> message
     }
+
+private val FeedItem.cacheKey: String
+    get() = "${platformId.serializedName}:$itemId"

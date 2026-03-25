@@ -128,8 +128,12 @@ fun Route.registerFeedRoutes(
                 call.respond(HttpStatusCode.BadRequest)
                 return@post
             }
+            val source = request.toDomainSourceOrNull() ?: run {
+                call.respond(HttpStatusCode.BadRequest)
+                return@post
+            }
             val repositories = ServerRepositories(dependenciesProvider()).forUser(user.userId)
-            repositories.addSource(request.toDomainSource())
+            repositories.addSource(source)
             call.respond(HttpStatusCode.Created)
         }
 
@@ -141,8 +145,12 @@ fun Route.registerFeedRoutes(
                 call.respond(HttpStatusCode.BadRequest)
                 return@delete
             }
+            val source = request.toDomainSourceOrNull() ?: run {
+                call.respond(HttpStatusCode.BadRequest)
+                return@delete
+            }
             val repositories = ServerRepositories(dependenciesProvider()).forUser(user.userId)
-            repositories.removeSource(request.toDomainSource())
+            repositories.removeSource(source)
             call.respond(HttpStatusCode.NoContent)
         }
 

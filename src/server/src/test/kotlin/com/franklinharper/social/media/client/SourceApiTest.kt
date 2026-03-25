@@ -97,6 +97,48 @@ class SourceApiTest {
         )
     }
 
+    @Test
+    fun `add source returns bad request for unsupported platform id`() = testApplication {
+        val authService = createAuthService()
+        val token = authService.signIn("alice@example.com", "secret").token
+        application {
+            module(
+                authService = authService,
+                dependencies = createDependencies(),
+            )
+        }
+
+        val response = authedJsonRequest(
+            token = token,
+            method = "POST",
+            path = "/api/sources",
+            body = """{"platformId":"mastodon","kind":"social_user","value":"alice"}""",
+        )
+
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+    }
+
+    @Test
+    fun `delete source returns bad request for unsupported source kind`() = testApplication {
+        val authService = createAuthService()
+        val token = authService.signIn("alice@example.com", "secret").token
+        application {
+            module(
+                authService = authService,
+                dependencies = createDependencies(),
+            )
+        }
+
+        val response = authedJsonRequest(
+            token = token,
+            method = "DELETE",
+            path = "/api/sources",
+            body = """{"platformId":"rss","kind":"newsletter","value":"https://example.com/feed.xml"}""",
+        )
+
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+    }
+
     private suspend fun io.ktor.server.testing.ApplicationTestBuilder.listSources(token: String): List<ConfiguredSource> {
         val response = client.get("/api/sources") {
             header(HttpHeaders.Authorization, "Bearer $token")
@@ -119,6 +161,26 @@ class SourceApiTest {
             header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(json.encodeToString(request))
+        }
+
+    private suspend fun io.ktor.server.testing.ApplicationTestBuilder.authedJsonRequest(
+        token: String,
+        method: String,
+        path: String,
+        body: String,
+    ): HttpResponse =
+        when (method) {
+            "POST" -> client.post(path) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(body)
+            }
+            "DELETE" -> client.delete(path) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(body)
+            }
+            else -> error("Unsupported method: $method")
         }
 
     private suspend fun createAuthService(database: com.franklinharper.social.media.client.db.SocialMediaDatabase = ServerDatabaseFactory.inMemory()): ServerSessionService {
