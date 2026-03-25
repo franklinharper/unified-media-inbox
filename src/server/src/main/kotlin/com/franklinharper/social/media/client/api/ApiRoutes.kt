@@ -1,14 +1,19 @@
 package com.franklinharper.social.media.client.api
 
 import com.franklinharper.social.media.client.auth.AuthFailure
+import com.franklinharper.social.media.client.auth.AuthenticatedUser
 import com.franklinharper.social.media.client.auth.ServerSessionService
+import com.franklinharper.social.media.client.persistence.ServerApiDependencies
+import com.franklinharper.social.media.client.persistence.ServerRepositories
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
+import io.ktor.server.application.call
 import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
+import io.ktor.server.routing.delete
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
@@ -104,8 +109,91 @@ fun Route.registerAuthRoutes(authServiceProvider: () -> ServerSessionService) {
     }
 }
 
+fun Route.registerFeedRoutes(
+    authServiceProvider: () -> ServerSessionService,
+    dependenciesProvider: () -> ServerApiDependencies,
+) {
+    route("/api") {
+        get("/sources") {
+            val user = call.requireAuthenticatedUser(authServiceProvider()) ?: return@get
+            val repositories = ServerRepositories(dependenciesProvider()).forUser(user.userId)
+            call.respondJson(ListSourcesResponse(repositories.listSources().map { it.toSourceDto() }))
+        }
+
+        post("/sources") {
+            val user = call.requireAuthenticatedUser(authServiceProvider()) ?: return@post
+            val request = try {
+                apiJson.decodeFromString(AddSourceRequest.serializer(), call.receiveText())
+            } catch (_: SerializationException) {
+                call.respond(HttpStatusCode.BadRequest)
+                return@post
+            }
+            val repositories = ServerRepositories(dependenciesProvider()).forUser(user.userId)
+            repositories.addSource(request.toDomainSource())
+            call.respond(HttpStatusCode.Created)
+        }
+
+        delete("/sources") {
+            val user = call.requireAuthenticatedUser(authServiceProvider()) ?: return@delete
+            val request = try {
+                apiJson.decodeFromString(SourceDto.serializer(), call.receiveText())
+            } catch (_: SerializationException) {
+                call.respond(HttpStatusCode.BadRequest)
+                return@delete
+            }
+            val repositories = ServerRepositories(dependenciesProvider()).forUser(user.userId)
+            repositories.removeSource(request.toDomainSource())
+            call.respond(HttpStatusCode.NoContent)
+        }
+
+        get("/feed") {
+            val user = call.requireAuthenticatedUser(authServiceProvider()) ?: return@get
+            val includeSeen = call.request.queryParameters["includeSeen"]?.toBooleanStrictOrNull() ?: false
+            val repositories = ServerRepositories(dependenciesProvider()).forUser(user.userId)
+            call.respondJson(repositories.listFeed(includeSeen).toFeedResponse())
+        }
+
+        post("/feed/refresh") {
+            val user = call.requireAuthenticatedUser(authServiceProvider()) ?: return@post
+            val includeSeen = call.request.queryParameters["includeSeen"]?.toBooleanStrictOrNull() ?: false
+            val repositories = ServerRepositories(dependenciesProvider()).forUser(user.userId)
+            call.respondJson(repositories.refreshFeed(includeSeen).toFeedResponse())
+        }
+
+        post("/feed/seen") {
+            val user = call.requireAuthenticatedUser(authServiceProvider()) ?: return@post
+            val request = try {
+                apiJson.decodeFromString(MarkSeenRequest.serializer(), call.receiveText())
+            } catch (_: SerializationException) {
+                call.respond(HttpStatusCode.BadRequest)
+                return@post
+            }
+            val repositories = ServerRepositories(dependenciesProvider()).forUser(user.userId)
+            repositories.markSeen(request.itemIds)
+            call.respond(HttpStatusCode.OK)
+        }
+    }
+}
+
 private suspend inline fun <reified T> ApplicationCall.respondJson(value: T) {
     respondText(apiJson.encodeToString(value), ContentType.Application.Json)
+}
+
+private suspend fun ApplicationCall.requireAuthenticatedUser(
+    authService: ServerSessionService,
+): AuthenticatedUser? {
+    val token = bearerToken() ?: run {
+        respond(HttpStatusCode.Unauthorized)
+        return null
+    }
+    return try {
+        authService.requireUser(token)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: AuthFailure) {
+        respond(HttpStatusCode.Unauthorized)
+        null
+    }
 }
 
 private fun ApplicationCall.bearerToken(): String? {

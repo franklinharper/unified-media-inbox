@@ -1,7 +1,12 @@
 package com.franklinharper.social.media.client
 
+import com.franklinharper.social.media.client.api.registerFeedRoutes
 import com.franklinharper.social.media.client.api.registerAuthRoutes
+import com.franklinharper.social.media.client.client.ClientRegistry
+import com.franklinharper.social.media.client.client.bluesky.BlueskyClient
+import com.franklinharper.social.media.client.client.rss.RssClient
 import com.franklinharper.social.media.client.auth.ServerSessionService
+import com.franklinharper.social.media.client.persistence.ServerApiDependencies
 import com.franklinharper.social.media.client.persistence.ServerDatabaseFactory
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
@@ -16,24 +21,59 @@ fun main() {
 }
 
 fun Application.module() {
-    val authService by lazy { createDefaultAuthService() }
-    module { authService }
+    val database by lazy { createDefaultDatabase() }
+    val authService by lazy { ServerSessionService(database) }
+    val dependencies by lazy { createDefaultDependencies(database) }
+    module(
+        authServiceProvider = { authService },
+        dependenciesProvider = { dependencies },
+    )
 }
 
-fun Application.module(authServiceProvider: () -> ServerSessionService) {
+fun Application.module(
+    authServiceProvider: () -> ServerSessionService,
+    dependenciesProvider: () -> ServerApiDependencies,
+) {
     routing {
         get("/") {
             call.respondText("Ktor: ${Greeting().greet()}")
         }
         registerAuthRoutes(authServiceProvider)
+        registerFeedRoutes(authServiceProvider, dependenciesProvider)
     }
 }
 
-fun Application.module(authService: ServerSessionService) {
-    module { authService }
+fun Application.module(authServiceProvider: () -> ServerSessionService) {
+    val dependencies by lazy { createDefaultDependencies(createDefaultDatabase()) }
+    module(authServiceProvider = authServiceProvider, dependenciesProvider = { dependencies })
 }
 
-private fun createDefaultAuthService(): ServerSessionService {
-    val databaseFile = File(System.getProperty("user.dir"), "social-media-server.db")
-    return ServerSessionService(ServerDatabaseFactory.fileBacked(databaseFile))
+fun Application.module(authService: ServerSessionService) {
+    val dependencies by lazy { createDefaultDependencies(createDefaultDatabase()) }
+    module(
+        authServiceProvider = { authService },
+        dependenciesProvider = { dependencies },
+    )
 }
+
+fun Application.module(authService: ServerSessionService, dependencies: ServerApiDependencies) {
+    module(
+        authServiceProvider = { authService },
+        dependenciesProvider = { dependencies },
+    )
+}
+
+private fun createDefaultDatabase() = ServerDatabaseFactory.fileBacked(
+    File(System.getProperty("user.dir"), "social-media-server.db"),
+)
+
+private fun createDefaultDependencies(database: com.franklinharper.social.media.client.db.SocialMediaDatabase): ServerApiDependencies =
+    ServerApiDependencies(
+        database = database,
+        clientRegistry = ClientRegistry(
+            listOf(
+                RssClient(),
+                BlueskyClient(),
+            ),
+        ),
+    )
