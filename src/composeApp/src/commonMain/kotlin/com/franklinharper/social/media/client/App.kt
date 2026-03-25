@@ -21,12 +21,16 @@ import com.franklinharper.social.media.client.app.FeedShellUiState
 import com.franklinharper.social.media.client.app.PlaceholderAppContainer
 import com.franklinharper.social.media.client.app.ResponsiveLayout
 import com.franklinharper.social.media.client.app.SourceType
+import com.franklinharper.social.media.client.app.WebAuthState
+import com.franklinharper.social.media.client.app.WebAuthStatus
 import com.franklinharper.social.media.client.app.createAppContainer
 import com.franklinharper.social.media.client.app.isWide
 import com.franklinharper.social.media.client.domain.FeedItem
+import com.franklinharper.social.media.client.remote.WebAuthenticationSessionRepository
 import com.franklinharper.social.media.client.ui.AddSourceScreen
 import com.franklinharper.social.media.client.ui.FeedItemDetailScreen
 import com.franklinharper.social.media.client.ui.FeedScreen
+import com.franklinharper.social.media.client.ui.LoginScreen
 import kotlinx.coroutines.launch
 
 @Composable
@@ -37,6 +41,14 @@ fun App() {
             val uriHandler = LocalUriHandler.current
             val layout = remember(maxWidth) { ResponsiveLayout.forMaxWidth(maxWidth) }
             val container = remember { createAppContainer() }
+            val webAuthRepository = remember(container) {
+                container
+                    .takeUnless { it === PlaceholderAppContainer }
+                    ?.sessionRepository as? WebAuthenticationSessionRepository
+            }
+            val webAuthState = remember(webAuthRepository) {
+                webAuthRepository?.let(::WebAuthState)
+            }
             val feedShellState = remember(container) {
                 if (container === PlaceholderAppContainer) {
                     null
@@ -60,42 +72,64 @@ fun App() {
             }
             val placeholderAddSourceState by rememberUpdatedState(AddSourceUiState())
             val addSourceUiState by addSourceState?.uiState?.collectAsState() ?: rememberUpdatedState(placeholderAddSourceState)
+            val authUiState by webAuthState?.uiState?.collectAsState()
+                ?: rememberUpdatedState(
+                    com.franklinharper.social.media.client.app.WebAuthUiState(
+                        status = WebAuthStatus.Authenticated,
+                    ),
+                )
             val scope = rememberCoroutineScope()
 
-            LaunchedEffect(feedShellState) {
-                feedShellState?.start()
+            LaunchedEffect(webAuthState) {
+                webAuthState?.start()
+            }
+            LaunchedEffect(feedShellState, authUiState.status) {
+                if (authUiState.status == WebAuthStatus.Authenticated) {
+                    feedShellState?.start()
+                }
             }
 
-            AppRoot(
-                feedState = uiState,
-                addSourceState = addSourceUiState,
-                isWideLayout = layout.isWide,
-                onSelectFeedSource = { source -> feedShellState?.selectFeedSource(source) },
-                onSelectAddSourceType = { type -> addSourceState?.selectType(type) },
-                onOpenAddSource = { addSourceState?.resetFlow() },
-                onBackFromAddSource = { addSourceState?.backToTypePicker() },
-                onOpenExternalUrl = { url -> uriHandler.openUri(url) },
-                onShowSeenItems = {
-                    scope.launch {
-                        feedShellState?.showSeenItems()
-                    }
-                },
-                onAddRssSource = { url ->
-                    scope.launch {
-                        addSourceState?.addRssSource(url)
-                    }
-                },
-                onAddBlueskySource = { handle ->
-                    scope.launch {
-                        addSourceState?.addBlueskySource(handle)
-                    }
-                },
-                onRefreshFeed = {
-                    scope.launch {
-                        feedShellState?.refresh()
-                    }
-                },
-            )
+            if (webAuthState != null && authUiState.status != WebAuthStatus.Authenticated) {
+                LoginScreen(
+                    state = authUiState.toLoginUiState(),
+                    onSignIn = { email, password ->
+                        scope.launch {
+                            webAuthState.signIn(email, password)
+                        }
+                    },
+                )
+            } else {
+                AppRoot(
+                    feedState = uiState,
+                    addSourceState = addSourceUiState,
+                    isWideLayout = layout.isWide,
+                    onSelectFeedSource = { source -> feedShellState?.selectFeedSource(source) },
+                    onSelectAddSourceType = { type -> addSourceState?.selectType(type) },
+                    onOpenAddSource = { addSourceState?.resetFlow() },
+                    onBackFromAddSource = { addSourceState?.backToTypePicker() },
+                    onOpenExternalUrl = { url -> uriHandler.openUri(url) },
+                    onShowSeenItems = {
+                        scope.launch {
+                            feedShellState?.showSeenItems()
+                        }
+                    },
+                    onAddRssSource = { url ->
+                        scope.launch {
+                            addSourceState?.addRssSource(url)
+                        }
+                    },
+                    onAddBlueskySource = { handle ->
+                        scope.launch {
+                            addSourceState?.addBlueskySource(handle)
+                        }
+                    },
+                    onRefreshFeed = {
+                        scope.launch {
+                            feedShellState?.refresh()
+                        }
+                    },
+                )
+            }
         }
     }
 }

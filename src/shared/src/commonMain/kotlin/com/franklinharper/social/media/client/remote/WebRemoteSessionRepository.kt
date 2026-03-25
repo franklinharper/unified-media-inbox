@@ -6,10 +6,16 @@ import com.franklinharper.social.media.client.domain.SessionState
 import com.franklinharper.social.media.client.repository.SessionRepository
 import kotlinx.serialization.encodeToString
 
+interface WebAuthenticationSessionRepository {
+    suspend fun restoreSession(): SessionState
+    suspend fun signIn(email: String, password: String): SessionState
+    suspend fun clearSession()
+}
+
 class WebRemoteSessionRepository(
     private val http: WebApiHttp,
-) : SessionRepository {
-    suspend fun signIn(email: String, password: String): SessionState {
+) : SessionRepository, WebAuthenticationSessionRepository {
+    override suspend fun signIn(email: String, password: String): SessionState {
         val response = http.post(
             path = "/api/auth/sign-in",
             body = webApiJson.encodeToString(
@@ -21,6 +27,9 @@ class WebRemoteSessionRepository(
         http.bearerToken = session.session.accessToken
         return session
     }
+
+    override suspend fun restoreSession(): SessionState =
+        getSessionState(PlatformId.Bluesky)
 
     override suspend fun getSessionState(platformId: PlatformId): SessionState {
         if (http.bearerToken.isNullOrBlank()) return SessionState.SignedOut
@@ -51,6 +60,10 @@ class WebRemoteSessionRepository(
 
     override suspend fun clearAll() {
         http.bearerToken = null
+    }
+
+    override suspend fun clearSession() {
+        clearAll()
     }
 }
 
