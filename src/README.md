@@ -103,6 +103,15 @@ in your IDE's toolbar or run it directly from the terminal:
     .\gradlew.bat :composeApp:jsBrowserDevelopmentRun
     ```
 
+The web app uses same-origin `/api/...` requests by default. To point it at a different API origin in staging or production,
+set the `social-media-client-api-base-url` meta tag in [composeApp/src/webMain/resources/index.html](./composeApp/src/webMain/resources/index.html):
+
+```html
+<meta name="social-media-client-api-base-url" content="https://api.example.com">
+```
+
+For local development, the webpack dev server runs on `http://localhost:8081` and proxies `/api/...` requests to the Ktor server on `http://localhost:8080`.
+
 ### Build and Run iOS Application
 
 To build and run the development version of the iOS app, use the run configuration from the run widget

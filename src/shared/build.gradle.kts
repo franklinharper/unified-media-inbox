@@ -42,7 +42,6 @@ kotlin {
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.ktor.clientCore)
-            implementation(libs.ktor.clientCio)
             implementation(libs.sqldelight.runtime)
             implementation(libs.sqldelight.coroutinesExtensions)
         }
@@ -50,13 +49,22 @@ kotlin {
             implementation(libs.kotlin.test)
         }
         androidMain.dependencies {
+            implementation(libs.ktor.clientCio)
             implementation(libs.sqldelight.androidDriver)
         }
         iosMain.dependencies {
+            implementation(libs.ktor.clientCio)
             implementation(libs.sqldelight.nativeDriver)
         }
         jvmMain.dependencies {
+            implementation(libs.ktor.clientCio)
             implementation(libs.sqldelight.sqliteDriver)
+        }
+        jsMain.dependencies {
+            implementation(libs.ktor.clientJs)
+        }
+        wasmJsMain.dependencies {
+            implementation(libs.ktor.clientJs)
         }
         jvmTest.dependencies {
             implementation(libs.kotlin.test)
