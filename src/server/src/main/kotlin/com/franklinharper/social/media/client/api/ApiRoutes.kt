@@ -1,5 +1,6 @@
 package com.franklinharper.social.media.client.api
 
+import com.franklinharper.social.media.client.auth.AuthFailure
 import com.franklinharper.social.media.client.auth.ServerSessionService
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
@@ -12,27 +13,32 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlin.coroutines.cancellation.CancellationException
 
 private val apiJson = Json {
     ignoreUnknownKeys = true
     encodeDefaults = true
 }
 
-fun Route.registerAuthRoutes(authService: ServerSessionService) {
+fun Route.registerAuthRoutes(authServiceProvider: () -> ServerSessionService) {
     route("/api/auth") {
         post("/sign-in") {
+            val authService = authServiceProvider()
             val request = try {
                 apiJson.decodeFromString(SignInRequest.serializer(), call.receiveText())
-            } catch (_: Exception) {
+            } catch (_: SerializationException) {
                 call.respond(HttpStatusCode.BadRequest)
                 return@post
             }
 
             val session = try {
                 authService.signIn(request.email, request.password)
-            } catch (_: Exception) {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: AuthFailure) {
                 call.respond(HttpStatusCode.Unauthorized)
                 return@post
             }
@@ -50,6 +56,7 @@ fun Route.registerAuthRoutes(authService: ServerSessionService) {
         }
 
         get("/session") {
+            val authService = authServiceProvider()
             val token = call.bearerToken() ?: run {
                 call.respond(HttpStatusCode.Unauthorized)
                 return@get
@@ -57,7 +64,9 @@ fun Route.registerAuthRoutes(authService: ServerSessionService) {
 
             val user = try {
                 authService.requireUser(token)
-            } catch (_: Exception) {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: AuthFailure) {
                 call.respond(HttpStatusCode.Unauthorized)
                 return@get
             }
@@ -74,6 +83,7 @@ fun Route.registerAuthRoutes(authService: ServerSessionService) {
         }
 
         post("/sign-out") {
+            val authService = authServiceProvider()
             val token = call.bearerToken() ?: run {
                 call.respond(HttpStatusCode.Unauthorized)
                 return@post
@@ -81,7 +91,9 @@ fun Route.registerAuthRoutes(authService: ServerSessionService) {
 
             try {
                 authService.requireUser(token)
-            } catch (_: Exception) {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: AuthFailure) {
                 call.respond(HttpStatusCode.Unauthorized)
                 return@post
             }

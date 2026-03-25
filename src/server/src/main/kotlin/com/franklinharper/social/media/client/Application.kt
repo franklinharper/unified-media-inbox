@@ -16,15 +16,16 @@ fun main() {
 }
 
 fun Application.module() {
-    module(createDefaultAuthService())
+    val authService by lazy { createDefaultAuthService() }
+    module { authService }
 }
 
-fun Application.module(authService: ServerSessionService) {
+fun Application.module(authServiceProvider: () -> ServerSessionService) {
     routing {
         get("/") {
             call.respondText("Ktor: ${Greeting().greet()}")
         }
-        registerAuthRoutes(authService)
+        registerAuthRoutes(authServiceProvider)
     }
 }
 

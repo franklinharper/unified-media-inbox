@@ -39,17 +39,17 @@ class ServerSessionService(
 
     suspend fun signIn(email: String, password: String): ServerSession {
         val credential = queries.selectUserPasswordCredentialByEmail(normalizeEmail(email))
-            .executeAsOneOrNull() ?: error("Invalid credentials")
+            .executeAsOneOrNull() ?: throw InvalidCredentialsException()
 
         if (!passwordHasher.verify(password, credential.password_hash)) {
-            error("Invalid credentials")
+            throw InvalidCredentialsException()
         }
 
         return createSession(credential.user_id)
     }
 
     suspend fun createSession(userId: String): ServerSession {
-        queries.selectUserById(userId).executeAsOneOrNull() ?: error("Unknown user: $userId")
+        queries.selectUserById(userId).executeAsOneOrNull() ?: throw UnknownUserException(userId)
 
         val session = ServerSession(
             token = sessionTokenGenerator(),
@@ -65,14 +65,14 @@ class ServerSessionService(
     }
 
     suspend fun requireUser(token: String): AuthenticatedUser {
-        val session = queries.selectServerSession(token).executeAsOneOrNull() ?: error("Unknown session: $token")
+        val session = queries.selectServerSession(token).executeAsOneOrNull() ?: throw UnknownSessionException(token)
 
         if (session.expires_at_epoch_millis <= clock()) {
             queries.removeServerSession(token)
-            error("Expired session: $token")
+            throw ExpiredSessionException(token)
         }
 
-        val user = queries.selectUserById(session.user_id).executeAsOneOrNull() ?: error("Missing user for session: $token")
+        val user = queries.selectUserById(session.user_id).executeAsOneOrNull() ?: throw MissingSessionUserException(token)
         return AuthenticatedUser(user.user_id, user.email)
     }
 

@@ -21,7 +21,7 @@ class AuthApiTest {
     fun `sign in returns session for valid email and password`() = testApplication {
         val authService = createAuthService()
         application {
-            module(authService)
+            module { authService }
         }
 
         val response = client.post("/api/auth/sign-in") {
@@ -40,7 +40,7 @@ class AuthApiTest {
         val authService = createAuthService()
         val token = authService.signIn("alice@example.com", "secret").token
         application {
-            module(authService)
+            module { authService }
         }
 
         val response = client.get("/api/auth/session") {
@@ -57,7 +57,7 @@ class AuthApiTest {
     fun `session restore returns unauthorized for invalid token`() = testApplication {
         val authService = createAuthService()
         application {
-            module(authService)
+            module { authService }
         }
 
         val response = client.get("/api/auth/session") {
@@ -72,7 +72,7 @@ class AuthApiTest {
         val authService = createAuthService()
         val token = authService.signIn("alice@example.com", "secret").token
         application {
-            module(authService)
+            module { authService }
         }
 
         val response = client.post("/api/auth/sign-out") {
