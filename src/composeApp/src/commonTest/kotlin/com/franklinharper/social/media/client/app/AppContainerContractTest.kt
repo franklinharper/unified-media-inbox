@@ -19,7 +19,11 @@ import com.franklinharper.social.media.client.repository.SeenItemRepository
 import com.franklinharper.social.media.client.repository.SessionRepository
 import com.franklinharper.social.media.client.repository.SourceErrorRepository
 import com.franklinharper.social.media.client.getPlatform
+import com.franklinharper.social.media.client.remote.WebRemoteConfiguredSourceRepository
+import com.franklinharper.social.media.client.remote.WebRemoteFeedRepository
+import com.franklinharper.social.media.client.remote.WebRemoteSessionRepository
 import kotlin.test.Test
+import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -59,6 +63,15 @@ class AppContainerContractTest {
         } else {
             assertSame(PlaceholderAppContainer, container)
         }
+    }
+
+    @Test
+    fun `remote app container wires web remote repositories`() {
+        val container = createRemoteAppContainer(baseUrl = "https://example.com")
+
+        assertIs<WebRemoteConfiguredSourceRepository>(container.configuredSourceRepository)
+        assertIs<WebRemoteSessionRepository>(container.sessionRepository)
+        assertIs<WebRemoteFeedRepository>(container.feedRepository)
     }
 }
 
