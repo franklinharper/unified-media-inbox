@@ -1,10 +1,15 @@
 package com.franklinharper.social.media.client.ui
 
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.runComposeUiTest
 import com.franklinharper.social.media.client.app.LoginUiState
 import kotlin.test.Test
@@ -60,5 +65,59 @@ class LoginScreenTest {
         }
 
         onNodeWithText("Your session expired. Sign in again.").assertExists()
+    }
+
+    @Test
+    fun `login screen ime next moves focus from email to password`() = runComposeUiTest {
+        setContent {
+            LoginScreen(
+                state = LoginUiState(),
+            )
+        }
+
+        onNodeWithTag("login-email-field").performClick()
+        onNodeWithTag("login-email-field").performImeAction()
+
+        onNodeWithTag("login-password-field").assertIsFocused()
+    }
+
+    @Test
+    fun `login screen keyboard navigation reaches both auth buttons`() = runComposeUiTest {
+        setContent {
+            LoginScreen(
+                state = LoginUiState(),
+            )
+        }
+
+        onNodeWithTag("login-email-field").performClick()
+        onNodeWithTag("login-email-field").performImeAction()
+        onNodeWithTag("login-password-field").performKeyInput {
+            pressKey(Key.Tab)
+        }
+        onNodeWithTag("login-submit-button").assertIsFocused()
+
+        onNodeWithTag("login-submit-button").performKeyInput {
+            pressKey(Key.Tab)
+        }
+        onNodeWithTag("login-sign-up-button").assertIsFocused()
+    }
+
+    @Test
+    fun `login screen enter on password submits sign in`() = runComposeUiTest {
+        var recorded: Pair<String, String>? = null
+
+        setContent {
+            LoginScreen(
+                state = LoginUiState(),
+                onSignIn = { email, password -> recorded = email to password },
+            )
+        }
+
+        onNodeWithTag("login-email-field").performTextInput("alice@example.com")
+        onNodeWithTag("login-email-field").performImeAction()
+        onNodeWithTag("login-password-field").performTextInput("secret")
+        onNodeWithTag("login-password-field").performImeAction()
+
+        assertEquals("alice@example.com" to "secret", recorded)
     }
 }
