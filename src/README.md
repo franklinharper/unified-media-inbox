@@ -112,6 +112,17 @@ set the `social-media-client-api-base-url` meta tag in [composeApp/src/webMain/r
 
 For local development, the webpack dev server runs on `http://localhost:8081` and proxies `/api/...` requests to the Ktor server on `http://localhost:8080`.
 
+### Browser E2E Scaffold
+
+There is a Playwright scaffold in [`../e2e`](../e2e) that can start the local server and JS web app automatically:
+
+```shell
+cd ../e2e
+npm test
+```
+
+The first browser test is currently skipped. The Compose JS auth screen renders through a canvas and does not yet expose stable browser selectors for reliable Playwright automation.
+
 ### Build and Run iOS Application
 
 To build and run the development version of the iOS app, use the run configuration from the run widget

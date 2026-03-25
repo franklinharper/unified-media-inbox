@@ -36,7 +36,10 @@ fun Application.module(
 ) {
     routing {
         get("/") {
-            call.respondText("Ktor: ${Greeting().greet()}")
+            call.respondText("OK")
+        }
+        get("/health") {
+            call.respondText("OK")
         }
         registerAuthRoutes(authServiceProvider)
         registerFeedRoutes(authServiceProvider, dependenciesProvider)
