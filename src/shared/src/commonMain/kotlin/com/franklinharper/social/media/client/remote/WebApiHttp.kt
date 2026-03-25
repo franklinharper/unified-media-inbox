@@ -69,6 +69,7 @@ internal fun WebApiResponse.requireSuccess(): WebApiResponse {
     if (statusCode in 200..299) return this
     throw when (statusCode) {
         400 -> WebApiException(ClientError.PermanentFailure(body.ifBlank { null }))
+        409 -> WebApiException(ClientError.PermanentFailure(body.ifBlank { null }))
         401 -> WebApiException(ClientError.AuthenticationError())
         403 -> WebApiException(ClientError.AuthenticationError())
         in 500..599 -> WebApiException(ClientError.TemporaryFailure("Server error: $statusCode"))

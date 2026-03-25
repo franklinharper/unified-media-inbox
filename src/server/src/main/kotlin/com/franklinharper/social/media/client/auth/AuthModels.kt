@@ -8,6 +8,8 @@ sealed class AuthFailure(message: String) : IllegalStateException(message)
 
 class InvalidCredentialsException : AuthFailure("Invalid credentials")
 
+class UserAlreadyExistsException(email: String) : AuthFailure("User already exists: $email")
+
 class UnknownUserException(userId: String) : AuthFailure("Unknown user: $userId")
 
 class UnknownSessionException(token: String) : AuthFailure("Unknown session: $token")

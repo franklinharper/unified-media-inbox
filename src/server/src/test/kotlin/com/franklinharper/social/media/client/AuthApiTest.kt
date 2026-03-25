@@ -36,6 +36,39 @@ class AuthApiTest {
     }
 
     @Test
+    fun `sign up creates account and returns session`() = testApplication {
+        val authService = ServerSessionService(ServerDatabaseFactory.inMemory())
+        application {
+            module { authService }
+        }
+
+        val response = client.post("/api/auth/sign-up") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"email":"new@example.com","password":"secret"}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = json.decodeFromString<AuthSessionResponse>(response.bodyAsText())
+        assertEquals("new@example.com", body.user.email)
+        assertTrue(body.token.isNotBlank())
+    }
+
+    @Test
+    fun `sign up returns conflict for existing email`() = testApplication {
+        val authService = createAuthService()
+        application {
+            module { authService }
+        }
+
+        val response = client.post("/api/auth/sign-up") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"email":"alice@example.com","password":"secret"}""")
+        }
+
+        assertEquals(HttpStatusCode.Conflict, response.status)
+    }
+
+    @Test
     fun `session restore returns user for valid bearer token`() = testApplication {
         val authService = createAuthService()
         val token = authService.signIn("alice@example.com", "secret").token

@@ -32,6 +32,24 @@ class LoginScreenTest {
     }
 
     @Test
+    fun `login screen submits signup email and password`() = runComposeUiTest {
+        var recorded: Pair<String, String>? = null
+
+        setContent {
+            LoginScreen(
+                state = LoginUiState(),
+                onSignUp = { email, password -> recorded = email to password },
+            )
+        }
+
+        onNodeWithTag("login-email-field").performTextInput("new@example.com")
+        onNodeWithTag("login-password-field").performTextInput("secret")
+        onNodeWithTag("login-sign-up-button").performClick()
+
+        assertEquals("new@example.com" to "secret", recorded)
+    }
+
+    @Test
     fun `login screen shows session expired message`() = runComposeUiTest {
         setContent {
             LoginScreen(

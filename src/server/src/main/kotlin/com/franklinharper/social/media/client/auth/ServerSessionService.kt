@@ -22,7 +22,7 @@ class ServerSessionService(
 
         database.transaction {
             if (queries.selectUserByEmail(normalizedEmail).executeAsOneOrNull() != null) {
-                error("User already exists: $normalizedEmail")
+                throw UserAlreadyExistsException(normalizedEmail)
             }
             queries.insertUser(
                 user_id = user.userId,

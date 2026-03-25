@@ -9,6 +9,7 @@ import kotlinx.serialization.encodeToString
 interface WebAuthenticationSessionRepository {
     suspend fun restoreSession(): SessionState
     suspend fun signIn(email: String, password: String): SessionState
+    suspend fun signUp(email: String, password: String): SessionState
     suspend fun clearSession()
 }
 
@@ -16,8 +17,16 @@ class WebRemoteSessionRepository(
     private val http: WebApiHttp,
 ) : SessionRepository, WebAuthenticationSessionRepository {
     override suspend fun signIn(email: String, password: String): SessionState {
+        return authenticate("/api/auth/sign-in", email, password)
+    }
+
+    override suspend fun signUp(email: String, password: String): SessionState {
+        return authenticate("/api/auth/sign-up", email, password)
+    }
+
+    private suspend fun authenticate(path: String, email: String, password: String): SessionState {
         val response = http.post(
-            path = "/api/auth/sign-in",
+            path = path,
             body = webApiJson.encodeToString(
                 SignInRequestDto.serializer(),
                 SignInRequestDto(email = email, password = password),

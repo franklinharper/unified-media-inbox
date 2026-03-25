@@ -72,6 +72,23 @@ class WebAuthStateTest {
     }
 
     @Test
+    fun `successful sign up enters authenticated state`() = runTest {
+        val state = WebAuthState(
+            sessionRepository = FakeWebAuthSessionRepository(
+                restoreState = SessionState.SignedOut,
+                signUpState = SessionState.SignedIn(
+                    AccountSession(accountId = "user-2", accessToken = "token-2"),
+                ),
+            ),
+        )
+
+        state.signUp("new@example.com", "secret")
+
+        assertEquals(WebAuthStatus.Authenticated, state.uiState.value.status)
+        assertEquals("new@example.com" to "secret", state.uiState.value.lastSubmittedCredentials)
+    }
+
+    @Test
     fun `unauthorized server response resets to session expired state`() = runTest {
         val repository = FakeWebAuthSessionRepository(
             restoreState = SessionState.SignedIn(
@@ -91,6 +108,7 @@ class WebAuthStateTest {
 private class FakeWebAuthSessionRepository(
     private val restoreState: SessionState,
     private val signInState: SessionState = restoreState,
+    private val signUpState: SessionState = restoreState,
     private val signInFailure: Throwable? = null,
 ) : WebAuthenticationSessionRepository {
     var clearCalls = 0
@@ -101,6 +119,9 @@ private class FakeWebAuthSessionRepository(
         signInFailure?.let { throw it }
         return signInState
     }
+
+    override suspend fun signUp(email: String, password: String): SessionState =
+        signUpState
 
     override suspend fun clearSession() {
         clearCalls += 1

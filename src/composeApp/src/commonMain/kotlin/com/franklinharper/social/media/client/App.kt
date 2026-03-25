@@ -103,6 +103,13 @@ fun App() {
                         }
                     }
                 },
+                onSignUp = { email, password ->
+                    if (webAuthState != null) {
+                        scope.launch {
+                            webAuthState.signUp(email, password)
+                        }
+                    }
+                },
                 onAuthenticationFailure = {
                     if (webAuthState != null) {
                         scope.launch {
@@ -157,6 +164,7 @@ internal fun AppRoot(
     authState: WebAuthUiState = WebAuthUiState(status = WebAuthStatus.Authenticated),
     isWideLayout: Boolean = false,
     onSignIn: (String, String) -> Unit = { _, _ -> },
+    onSignUp: (String, String) -> Unit = { _, _ -> },
     onAuthenticationFailure: () -> Unit = {},
     onSelectFeedSource: (com.franklinharper.social.media.client.domain.FeedSource?) -> Unit = {},
     onSelectAddSourceType: (SourceType) -> Unit = {},
@@ -191,6 +199,7 @@ internal fun AppRoot(
         LoginScreen(
             state = authState.toLoginUiState(),
             onSignIn = onSignIn,
+            onSignUp = onSignUp,
         )
         return
     }

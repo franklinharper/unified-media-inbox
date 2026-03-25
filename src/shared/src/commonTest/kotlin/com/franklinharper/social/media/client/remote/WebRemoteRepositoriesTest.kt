@@ -162,6 +162,35 @@ class WebRemoteRepositoriesTest {
         assertEquals("token-abc", http.bearerToken)
         assertEquals("/api/auth/sign-in", http.lastPostPath)
     }
+
+    @Test
+    fun `remote session repository signs up and stores bearer token`() = runBlocking {
+        val http = FakeWebApiHttp(
+            postResponses = mapOf(
+                "/api/auth/sign-up" to WebApiResponse(
+                    statusCode = 200,
+                    body = """
+                        {
+                          "token": "token-signup",
+                          "user": {
+                            "userId": "user-42",
+                            "email": "new@example.com"
+                          }
+                        }
+                    """.trimIndent(),
+                ),
+            ),
+        )
+        val repository = WebRemoteSessionRepository(http)
+
+        val state = repository.signUp("new@example.com", "secret")
+
+        val signedIn = assertIs<SessionState.SignedIn>(state)
+        assertEquals("token-signup", signedIn.session.accessToken)
+        assertEquals("token-signup", http.bearerToken)
+        assertEquals("/api/auth/sign-up", http.lastPostPath)
+        assertEquals("""{"email":"new@example.com","password":"secret"}""", http.lastPostBody)
+    }
 }
 
 private class FakeWebApiHttp(

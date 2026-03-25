@@ -37,15 +37,34 @@ class WebAuthState(
     }
 
     suspend fun signIn(email: String, password: String) {
+        submit(email, password, AuthAction.SignIn) {
+            sessionRepository.signIn(email, password)
+        }
+    }
+
+    suspend fun signUp(email: String, password: String) {
+        submit(email, password, AuthAction.SignUp) {
+            sessionRepository.signUp(email, password)
+        }
+    }
+
+    private suspend fun submit(
+        email: String,
+        password: String,
+        action: AuthAction,
+        request: suspend () -> SessionState,
+    ) {
         _uiState.value = WebAuthUiState(
             status = WebAuthStatus.Authenticating,
             message = null,
             lastSubmittedCredentials = email to password,
+            activeAction = action,
         )
         try {
-            _uiState.value = sessionRepository.signIn(email, password).toUiState(
+            _uiState.value = request().toUiState(
                 fallbackStatus = WebAuthStatus.Error,
                 previousCredentials = email to password,
+                action = action,
             )
         } catch (cancellation: CancellationException) {
             _uiState.update { it.copy(status = WebAuthStatus.Unauthenticated) }
@@ -53,8 +72,14 @@ class WebAuthState(
         } catch (failure: Throwable) {
             _uiState.value = WebAuthUiState(
                 status = WebAuthStatus.Error,
-                message = failure.toMessage(defaultMessage = "Unable to sign in."),
+                message = failure.toMessage(
+                    defaultMessage = when (action) {
+                        AuthAction.SignIn -> "Unable to sign in."
+                        AuthAction.SignUp -> "Unable to create account."
+                    },
+                ),
                 lastSubmittedCredentials = email to password,
+                activeAction = action,
             )
         }
     }
@@ -65,6 +90,7 @@ class WebAuthState(
             status = WebAuthStatus.SessionExpired,
             message = "Your session expired. Sign in again.",
             lastSubmittedCredentials = _uiState.value.lastSubmittedCredentials,
+            activeAction = AuthAction.SignIn,
         )
     }
 }
@@ -73,18 +99,26 @@ data class WebAuthUiState(
     val status: WebAuthStatus = WebAuthStatus.Unauthenticated,
     val message: String? = null,
     val lastSubmittedCredentials: Pair<String, String>? = null,
+    val activeAction: AuthAction = AuthAction.SignIn,
 ) {
     fun toLoginUiState(): LoginUiState =
         LoginUiState(
             isSubmitting = status == WebAuthStatus.Authenticating,
             message = message,
+            activeAction = activeAction,
         )
 }
 
 data class LoginUiState(
     val isSubmitting: Boolean = false,
     val message: String? = null,
+    val activeAction: AuthAction = AuthAction.SignIn,
 )
+
+enum class AuthAction {
+    SignIn,
+    SignUp,
+}
 
 enum class WebAuthStatus {
     Unauthenticated,
@@ -97,20 +131,24 @@ enum class WebAuthStatus {
 private fun SessionState.toUiState(
     fallbackStatus: WebAuthStatus,
     previousCredentials: Pair<String, String>?,
+    action: AuthAction = AuthAction.SignIn,
 ): WebAuthUiState = when (this) {
     is SessionState.SignedIn -> WebAuthUiState(
         status = WebAuthStatus.Authenticated,
         lastSubmittedCredentials = previousCredentials,
+        activeAction = action,
     )
     SessionState.SignedOut,
     SessionState.NotRequired -> WebAuthUiState(
         status = if (this == SessionState.NotRequired) WebAuthStatus.Authenticated else fallbackStatus,
         lastSubmittedCredentials = previousCredentials,
+        activeAction = action,
     )
     is SessionState.Expired -> WebAuthUiState(
         status = WebAuthStatus.SessionExpired,
         message = reason ?: "Your session expired. Sign in again.",
         lastSubmittedCredentials = previousCredentials,
+        activeAction = action,
     )
 }
 
