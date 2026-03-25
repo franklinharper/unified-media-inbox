@@ -21,10 +21,12 @@ import com.franklinharper.social.media.client.app.FeedShellUiState
 import com.franklinharper.social.media.client.app.PlaceholderAppContainer
 import com.franklinharper.social.media.client.app.ResponsiveLayout
 import com.franklinharper.social.media.client.app.SourceType
+import com.franklinharper.social.media.client.app.WebAuthUiState
 import com.franklinharper.social.media.client.app.WebAuthState
 import com.franklinharper.social.media.client.app.WebAuthStatus
 import com.franklinharper.social.media.client.app.createAppContainer
 import com.franklinharper.social.media.client.app.isWide
+import com.franklinharper.social.media.client.domain.ClientError
 import com.franklinharper.social.media.client.domain.FeedItem
 import com.franklinharper.social.media.client.remote.WebAuthenticationSessionRepository
 import com.franklinharper.social.media.client.ui.AddSourceScreen
@@ -89,47 +91,51 @@ fun App() {
                 }
             }
 
-            if (webAuthState != null && authUiState.status != WebAuthStatus.Authenticated) {
-                LoginScreen(
-                    state = authUiState.toLoginUiState(),
-                    onSignIn = { email, password ->
+            AppRoot(
+                feedState = uiState,
+                addSourceState = addSourceUiState,
+                authState = authUiState,
+                isWideLayout = layout.isWide,
+                onSignIn = { email, password ->
+                    if (webAuthState != null) {
                         scope.launch {
                             webAuthState.signIn(email, password)
                         }
-                    },
-                )
-            } else {
-                AppRoot(
-                    feedState = uiState,
-                    addSourceState = addSourceUiState,
-                    isWideLayout = layout.isWide,
-                    onSelectFeedSource = { source -> feedShellState?.selectFeedSource(source) },
-                    onSelectAddSourceType = { type -> addSourceState?.selectType(type) },
-                    onOpenAddSource = { addSourceState?.resetFlow() },
-                    onBackFromAddSource = { addSourceState?.backToTypePicker() },
-                    onOpenExternalUrl = { url -> uriHandler.openUri(url) },
-                    onShowSeenItems = {
+                    }
+                },
+                onAuthenticationFailure = {
+                    if (webAuthState != null) {
                         scope.launch {
-                            feedShellState?.showSeenItems()
+                            webAuthState.onUnauthorized()
                         }
-                    },
-                    onAddRssSource = { url ->
-                        scope.launch {
-                            addSourceState?.addRssSource(url)
-                        }
-                    },
-                    onAddBlueskySource = { handle ->
-                        scope.launch {
-                            addSourceState?.addBlueskySource(handle)
-                        }
-                    },
-                    onRefreshFeed = {
-                        scope.launch {
-                            feedShellState?.refresh()
-                        }
-                    },
-                )
-            }
+                    }
+                },
+                onSelectFeedSource = { source -> feedShellState?.selectFeedSource(source) },
+                onSelectAddSourceType = { type -> addSourceState?.selectType(type) },
+                onOpenAddSource = { addSourceState?.resetFlow() },
+                onBackFromAddSource = { addSourceState?.backToTypePicker() },
+                onOpenExternalUrl = { url -> uriHandler.openUri(url) },
+                onShowSeenItems = {
+                    scope.launch {
+                        feedShellState?.showSeenItems()
+                    }
+                },
+                onAddRssSource = { url ->
+                    scope.launch {
+                        addSourceState?.addRssSource(url)
+                    }
+                },
+                onAddBlueskySource = { handle ->
+                    scope.launch {
+                        addSourceState?.addBlueskySource(handle)
+                    }
+                },
+                onRefreshFeed = {
+                    scope.launch {
+                        feedShellState?.refresh()
+                    }
+                },
+            )
         }
     }
 }
@@ -148,7 +154,10 @@ fun AppPreviewContent() {
 internal fun AppRoot(
     feedState: FeedShellUiState,
     addSourceState: AddSourceUiState,
+    authState: WebAuthUiState = WebAuthUiState(status = WebAuthStatus.Authenticated),
     isWideLayout: Boolean = false,
+    onSignIn: (String, String) -> Unit = { _, _ -> },
+    onAuthenticationFailure: () -> Unit = {},
     onSelectFeedSource: (com.franklinharper.social.media.client.domain.FeedSource?) -> Unit = {},
     onSelectAddSourceType: (SourceType) -> Unit = {},
     onOpenAddSource: () -> Unit = {},
@@ -162,11 +171,28 @@ internal fun AppRoot(
     var screen by rememberSaveable { mutableStateOf(AppScreen.Feed) }
     var selectedItem by remember { mutableStateOf<FeedItem?>(null) }
 
+    LaunchedEffect(authState.status, feedState.loadError) {
+        if (
+            authState.status == WebAuthStatus.Authenticated &&
+            feedState.loadError is ClientError.AuthenticationError
+        ) {
+            onAuthenticationFailure()
+        }
+    }
+
     LaunchedEffect(screen, addSourceState.didAddSource) {
         if (screen == AppScreen.AddSource && addSourceState.didAddSource) {
             screen = AppScreen.Feed
             onRefreshFeed()
         }
+    }
+
+    if (authState.status != WebAuthStatus.Authenticated) {
+        LoginScreen(
+            state = authState.toLoginUiState(),
+            onSignIn = onSignIn,
+        )
+        return
     }
 
     when (screen) {

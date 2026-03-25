@@ -7,8 +7,16 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.franklinharper.social.media.client.AppRoot
 import com.franklinharper.social.media.client.app.FeedShellUiState
+import com.franklinharper.social.media.client.app.AddSourceUiState
+import com.franklinharper.social.media.client.app.WebAuthStatus
+import com.franklinharper.social.media.client.app.WebAuthUiState
+import com.franklinharper.social.media.client.domain.ClientError
 import com.franklinharper.social.media.client.domain.FeedItem
 import com.franklinharper.social.media.client.domain.FeedSource
 import com.franklinharper.social.media.client.domain.PlatformId
@@ -18,6 +26,20 @@ import kotlin.test.assertContentEquals
 
 @OptIn(ExperimentalTestApi::class)
 class FeedScreenTest {
+
+    @Test
+    fun `web root shows login before authenticated feed`() = runComposeUiTest {
+        setContent {
+            AppRoot(
+                feedState = FeedShellUiState(),
+                addSourceState = AddSourceUiState(),
+                authState = WebAuthUiState(status = WebAuthStatus.Unauthenticated),
+            )
+        }
+
+        onNodeWithTag("login-email-field").assertExists()
+        onNodeWithText("Feed").assertDoesNotExist()
+    }
 
     @Test
     fun `feed screen shows add sources empty state when no sources exist`() = runComposeUiTest {
@@ -280,6 +302,29 @@ class FeedScreenTest {
         check(unseenY < seenY) {
             "Expected unseen items above seen items, but positions were $unseenY and $seenY."
         }
+    }
+
+    @Test
+    fun `unauthorized result returns user to login screen`() = runComposeUiTest {
+        setContent {
+            var authState by remember { mutableStateOf(WebAuthUiState(status = WebAuthStatus.Authenticated)) }
+            AppRoot(
+                feedState = FeedShellUiState(
+                    loadError = ClientError.AuthenticationError("Your session expired. Sign in again."),
+                ),
+                addSourceState = AddSourceUiState(),
+                authState = authState,
+                onAuthenticationFailure = {
+                    authState = WebAuthUiState(
+                        status = WebAuthStatus.SessionExpired,
+                        message = "Your session expired. Sign in again.",
+                    )
+                },
+            )
+        }
+
+        onNodeWithTag("login-email-field").assertExists()
+        onNodeWithText("Your session expired. Sign in again.").assertExists()
     }
 }
 
