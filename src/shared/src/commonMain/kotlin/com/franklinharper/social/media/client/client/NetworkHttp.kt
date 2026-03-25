@@ -4,6 +4,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.defaultRequest
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
@@ -55,6 +56,23 @@ internal object NetworkHttp {
             header(HttpHeaders.ContentType, "application/json")
             headers.forEach { (name, value) -> header(name, value) }
             setBody(body)
+        }
+        return NetworkResponse(
+            statusCode = response.status.value,
+            body = response.bodyAsText(),
+            headers = response.headers.entries().associate { (name, values) -> name to values.joinToString(",") },
+        )
+    }
+
+    suspend fun deleteJson(
+        url: String,
+        body: String? = null,
+        headers: Map<String, String> = emptyMap(),
+    ): NetworkResponse {
+        val response = client.delete(url) {
+            header(HttpHeaders.ContentType, "application/json")
+            headers.forEach { (name, value) -> header(name, value) }
+            body?.let(::setBody)
         }
         return NetworkResponse(
             statusCode = response.status.value,
