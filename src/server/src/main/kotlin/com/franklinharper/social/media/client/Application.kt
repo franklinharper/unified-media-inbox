@@ -29,6 +29,10 @@ fun Application.module(authServiceProvider: () -> ServerSessionService) {
     }
 }
 
+fun Application.module(authService: ServerSessionService) {
+    module { authService }
+}
+
 private fun createDefaultAuthService(): ServerSessionService {
     val databaseFile = File(System.getProperty("user.dir"), "social-media-server.db")
     return ServerSessionService(ServerDatabaseFactory.fileBacked(databaseFile))
