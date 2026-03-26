@@ -190,7 +190,11 @@ Recommendation:
 
 - trigger immediately after local mutations, but coalesce aggressively if multiple changes happen close together
 - also run a pull before feed refresh if the user is signed in
-- when the user signs in and the local database is empty, bootstrap from the server before normal app usage proceeds
+- on sign-in, require full bootstrap before normal app usage only when:
+  - the local database is empty
+  - the signed-in account differs from the account that populated the local database
+  - local sync metadata is missing, invalid, or incompatible
+- on same-account sign-in with valid sync metadata, complete sign-in and run incremental sync immediately after
 
 This gives most of the value of shared state without background workers or perpetual polling.
 
@@ -267,9 +271,12 @@ Suggested implementation order:
 - `GET /api/sync/bootstrap` is required in v1
 - `sync_failures` must be durable local state
 - source-error state is included in v1 sync scope
-- sign-in with an empty local database should bootstrap from server state before normal app usage begins
+- sign-in should force full bootstrap only at risky boundaries:
+  - empty local database
+  - account change
+  - missing or invalid sync metadata
+- same-account sign-in with valid sync metadata should use immediate incremental sync instead of blocking on full reconciliation
 
 ## Open Questions
 
 - Whether pull should be pure incremental from the start or bootstrap with occasional full snapshots
-- Whether non-empty local databases should always perform a full reconciliation at sign-in or only use incremental sync
