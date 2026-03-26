@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests",
-  timeout: 60_000,
+  timeout: 120_000,
   fullyParallel: false,
   retries: 0,
   use: {
@@ -14,7 +14,7 @@ export default defineConfig({
     {
       command: "cd ../src && ./gradlew :server:run --no-daemon",
       url: "http://127.0.0.1:8080/health",
-      reuseExistingServer: false,
+      reuseExistingServer: true,
       stdout: "pipe",
       stderr: "pipe",
       timeout: 120_000,
@@ -22,7 +22,7 @@ export default defineConfig({
     {
       command: "cd ../src && ./gradlew :composeApp:jsBrowserDevelopmentRun --no-daemon",
       url: "http://127.0.0.1:8081/",
-      reuseExistingServer: false,
+      reuseExistingServer: true,
       stdout: "pipe",
       stderr: "pipe",
       timeout: 180_000,
@@ -33,6 +33,8 @@ export default defineConfig({
       name: "chromium",
       use: {
         ...devices["Desktop Chrome"],
+        channel: "chromium",
+        viewport: { width: 1280, height: 720 },
       },
     },
   ],

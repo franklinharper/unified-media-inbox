@@ -4,7 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "test": "playwright test"
+    "test": "playwright test",
+    "debug:signup": "node scripts/debug-signup.js",
+    "debug:add-source": "node scripts/debug-add-source.js",
+    "debug:hnrss": "node scripts/debug-hnrss.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.2",

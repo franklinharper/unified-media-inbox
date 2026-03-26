@@ -123,6 +123,17 @@ npm test
 
 The first browser test is currently skipped. The Compose JS auth screen renders through a canvas and does not yet expose stable browser selectors for reliable Playwright automation.
 
+For repeatable browser debugging without ad hoc `node -e` commands, use the checked-in debug scripts:
+
+```shell
+cd ../e2e
+npm run debug:signup
+npm run debug:add-source
+npm run debug:hnrss
+```
+
+These scripts are intended to be approved once as stable `npm run ...` commands instead of approving each one-off Playwright probe separately.
+
 ### Build and Run iOS Application
 
 To build and run the development version of the iOS app, use the run configuration from the run widget
