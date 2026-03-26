@@ -219,6 +219,9 @@ internal fun AppRoot(
             feedVisible = authState.status == WebAuthStatus.Authenticated,
             isSubmitting = authState.toLoginUiState().isSubmitting,
             isAddingSource = addSourceState.isAdding,
+            feedItemCount = feedState.visibleItems.size,
+            feedSourceNames = feedState.visibleItems.map { it.source.displayName }.distinct(),
+            feedItemTitles = feedState.visibleItems.mapNotNull { it.title?.trim()?.takeIf(String::isNotEmpty) }.take(10),
         )
     }
 

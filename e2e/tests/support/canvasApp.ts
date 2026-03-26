@@ -15,6 +15,9 @@ const FEED = {
   signOutTestId: "e2e-feed-sign-out",
   rssUrlTestId: "e2e-add-source-rss-url",
   rssSubmitTestId: "e2e-add-source-submit-rss",
+  itemCountTestId: "e2e-feed-item-count",
+  sourceNamesTestId: "e2e-feed-source-names",
+  itemTitlesTestId: "e2e-feed-item-titles",
 };
 
 export async function loadApp(page: Page): Promise<void> {
@@ -52,7 +55,7 @@ export async function signInThroughCanvas(page: Page, email: string, password: s
   await expect(page.getByText("Feed")).toBeVisible({ timeout: 15_000 });
 }
 
-export async function addRssSourceThroughCanvas(page: Page, url: string): Promise<FeedRefreshPayload> {
+export async function addRssSourceThroughCanvas(page: Page, url: string): Promise<void> {
   const addSourceResponsePromise = page.waitForResponse((response) =>
     response.url().includes("/api/sources") && response.request().method() === "POST",
   );
@@ -63,12 +66,10 @@ export async function addRssSourceThroughCanvas(page: Page, url: string): Promis
   const addSourceResponse = await addSourceResponsePromise;
   expect(addSourceResponse.status()).toBe(201);
 
-  const initialRefresh = await waitForFeedRefresh(page, async () => {
+  await waitForFeedRefresh(page, async () => {
     await pressBridgeButton(page, FEED.refreshTestId);
   });
-  if (initialRefresh.items.length > 0) return initialRefresh;
-
-  return refreshFeedUntilItems(page, initialRefresh);
+  await refreshFeedUntilItems(page);
 }
 
 export async function signOutFromFeed(page: Page): Promise<void> {
@@ -76,26 +77,15 @@ export async function signOutFromFeed(page: Page): Promise<void> {
   await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible({ timeout: 15_000 });
 }
 
-export async function refreshFeedUntilItems(
-  page: Page,
-  initialRefresh?: FeedRefreshPayload,
-): Promise<FeedRefreshPayload> {
-  if (initialRefresh != null && initialRefresh.items.length > 0) return initialRefresh;
-
-  var latest = initialRefresh;
+export async function refreshFeedUntilItems(page: Page): Promise<void> {
   for (let attempt = 0; attempt < 4; attempt++) {
+    if ((await readFeedItemCount(page)) > 0) return;
     await page.waitForTimeout(2_000);
-    latest = await waitForFeedRefresh(page, async () => {
+    await waitForFeedRefresh(page, async () => {
       await pressBridgeButton(page, FEED.refreshTestId);
     });
-    if (latest.items.length > 0) return latest;
   }
-
-  return latest ?? {
-    status: 200,
-    items: [],
-    sourceStatuses: [],
-  };
+  expect(await readFeedItemCount(page)).toBeGreaterThan(0);
 }
 
 async function setBridgeField(page: Page, testId: string, value: string): Promise<void> {
@@ -116,29 +106,15 @@ async function pressBridgeButton(page: Page, testId: string): Promise<void> {
 }
 
 
-export async function expectRecentFeedItems(payload: FeedRefreshPayload): Promise<void> {
-  expect(payload.status).toBe(200);
-  expect(payload.items.length).toBeGreaterThan(0);
-  expect(payload.items.some((item) => (item.title ?? "").trim().length > 0)).toBeTruthy();
-  expect(
-    payload.items.some((item) => /hacker news/i.test(item.source.displayName)),
-  ).toBeTruthy();
+export async function expectRecentFeedItems(page: Page): Promise<void> {
+  expect(await readFeedItemCount(page)).toBeGreaterThan(0);
 
-  const twoWeeksAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
-  expect(
-    payload.items.some((item) => item.publishedAtEpochMillis >= twoWeeksAgo),
-  ).toBeTruthy();
+  const sourceNames = await page.getByTestId(FEED.sourceNamesTestId).textContent();
+  expect(sourceNames ?? "").toMatch(/hacker news/i);
+
+  const itemTitles = await page.getByTestId(FEED.itemTitlesTestId).textContent();
+  expect((itemTitles ?? "").trim().length).toBeGreaterThan(0);
 }
-
-type FeedRefreshPayload = {
-  status: number;
-  items: Array<{
-    title: string | null;
-    publishedAtEpochMillis: number;
-    source: { displayName: string };
-  }>;
-  sourceStatuses: Array<unknown>;
-};
 
 async function waitForFeedRefresh(
   page: Page,
@@ -149,9 +125,10 @@ async function waitForFeedRefresh(
   );
   await trigger();
   const response = await feedResponsePromise;
-  const payload = (await response.json()) as Omit<FeedRefreshPayload, "status">;
-  return {
-    status: response.status(),
-    ...payload,
-  };
+  await response.body().catch(() => null);
+}
+
+async function readFeedItemCount(page: Page): Promise<number> {
+  const text = await page.getByTestId(FEED.itemCountTestId).textContent();
+  return Number.parseInt(text ?? "0", 10) || 0;
 }

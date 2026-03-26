@@ -70,9 +70,11 @@ internal fun installWebAutomationBridge(state: WebAutomationState?) {
     val signOutButton = createButton("Sign out", "e2e-feed-sign-out")
     val rssUrlInput = createInput("url", "e2e-add-source-rss-url")
     val rssAddButton = createButton("Add RSS", "e2e-add-source-submit-rss")
+    val feedItemCount = createReadOnlyValue("e2e-feed-item-count")
+    val feedSourceNames = createReadOnlyValue("e2e-feed-source-names")
+    val feedItemTitles = createReadOnlyValue("e2e-feed-item-titles")
     feedPanel.append(refreshButton, signOutButton, rssUrlInput, rssAddButton)
-
-    bridge.append(authPanel, feedPanel)
+    bridge.append(authPanel, feedPanel, feedItemCount, feedSourceNames, feedItemTitles)
     body.appendChild(bridge)
 
     emailInput.oninput = {
@@ -119,8 +121,29 @@ internal fun installWebAutomationBridge(state: WebAutomationState?) {
             refreshButton.disabled = false
             signOutButton.disabled = false
             rssAddButton.disabled = !uiState.canSubmitRss
+            feedItemCount.textContent = uiState.feedItemCount.toString()
+            feedSourceNames.textContent = uiState.feedSourceNames.joinToString("\n")
+            feedItemTitles.textContent = uiState.feedItemTitles.joinToString("\n")
         }
     }
+}
+
+private fun createReadOnlyValue(testId: String): HTMLDivElement {
+    val element = document.createElement("div") as HTMLDivElement
+    element.setAttribute("data-testid", testId)
+    element.setAttribute(
+        "style",
+        """
+        white-space:pre-wrap;
+        word-break:break-word;
+        padding:6px 8px;
+        border:1px solid rgba(0,0,0,0.12);
+        border-radius:8px;
+        background:rgba(255,255,255,0.75);
+        min-height:20px;
+        """.trimIndent(),
+    )
+    return element
 }
 
 private fun createInput(type: String, testId: String): HTMLInputElement {

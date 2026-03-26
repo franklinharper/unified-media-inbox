@@ -16,12 +16,12 @@ test("user can sign up, add HNRSS frontpage, sign out, sign back in, and load re
   await loadApp(page);
   await signUpThroughCanvas(page, uniqueEmail, password);
 
-  const feedResponse = await addRssSourceThroughCanvas(page, "https://hnrss.org/frontpage");
-  await expectRecentFeedItems(feedResponse);
+  await addRssSourceThroughCanvas(page, "https://hnrss.org/frontpage");
+  await expectRecentFeedItems(page);
 
   await signOutFromFeed(page);
   await signInThroughCanvas(page, uniqueEmail, password);
 
-  const refreshedFeed = await refreshFeedUntilItems(page);
-  await expectRecentFeedItems(refreshedFeed);
+  await refreshFeedUntilItems(page);
+  await expectRecentFeedItems(page);
 });

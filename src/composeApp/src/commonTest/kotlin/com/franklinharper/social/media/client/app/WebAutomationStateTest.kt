@@ -76,4 +76,23 @@ class WebAutomationStateTest {
 
         assertEquals(emptyList(), events)
     }
+
+    @Test
+    fun `environment updates expose feed metadata for automation assertions`() {
+        val state = WebAutomationState()
+
+        state.updateEnvironment(
+            authVisible = false,
+            feedVisible = true,
+            isSubmitting = false,
+            isAddingSource = false,
+            feedItemCount = 2,
+            feedSourceNames = listOf("Hacker News"),
+            feedItemTitles = listOf("Story one", "Story two"),
+        )
+
+        assertEquals(2, state.uiState.value.feedItemCount)
+        assertEquals(listOf("Hacker News"), state.uiState.value.feedSourceNames)
+        assertEquals(listOf("Story one", "Story two"), state.uiState.value.feedItemTitles)
+    }
 }

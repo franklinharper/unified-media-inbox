@@ -122,7 +122,7 @@ npm test
 ```
 
 The current browser test drives the Compose JS app through Playwright and validates the live sign-up, sign-in, sign-out, add-source, and feed-refresh flow.
-For the most brittle browser interactions, the test runner now enables a web-only automation bridge with `?automationBridge=1`. The bridge exposes stable DOM controls for auth, RSS add-source, refresh, and sign-out while still invoking the same app callbacks and backend requests as the real UI.
+For the most brittle browser interactions, the test runner now enables a web-only automation bridge with `?automationBridge=1`. The bridge exposes stable DOM controls for auth, RSS add-source, refresh, and sign-out, plus read-only feed metadata for assertions, while still invoking the same app callbacks and backend requests as the real UI.
 
 Near-term browser auth e2e TODOs:
 - duplicate-email signup error

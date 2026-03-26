@@ -13,6 +13,9 @@ data class WebAutomationUiState(
     val feedVisible: Boolean = false,
     val isSubmitting: Boolean = false,
     val isAddingSource: Boolean = false,
+    val feedItemCount: Int = 0,
+    val feedSourceNames: List<String> = emptyList(),
+    val feedItemTitles: List<String> = emptyList(),
 ) {
     val canSubmitAuth: Boolean
         get() = !isSubmitting && email.isNotBlank() && password.isNotBlank()
@@ -50,6 +53,9 @@ class WebAutomationState {
         feedVisible: Boolean,
         isSubmitting: Boolean,
         isAddingSource: Boolean,
+        feedItemCount: Int,
+        feedSourceNames: List<String>,
+        feedItemTitles: List<String>,
     ) {
         _uiState.update {
             it.copy(
@@ -57,6 +63,9 @@ class WebAutomationState {
                 feedVisible = feedVisible,
                 isSubmitting = isSubmitting,
                 isAddingSource = isAddingSource,
+                feedItemCount = feedItemCount,
+                feedSourceNames = feedSourceNames,
+                feedItemTitles = feedItemTitles,
             )
         }
     }
