@@ -152,7 +152,7 @@ Recommended server API shape:
   - returns accepted mutations, rejected mutations, and resolved entity state
 - `GET /api/sync/pull?since=<cursor>`
   - returns remote changes since the client’s last successful pull
-- optionally `GET /api/sync/bootstrap`
+- `GET /api/sync/bootstrap`
   - returns full current syncable state for first-time device hydration
 
 The server should return:
@@ -171,7 +171,8 @@ Recommended tables:
 
 - `pending_sync_mutations`
 - `sync_state`
-- optionally `sync_conflicts` or `sync_failures` if diagnostics need durability
+- `sync_failures`
+- optionally `sync_conflicts` if conflict diagnostics later need separate storage
 
 Existing app tables should continue to store the resolved application state, not a separate “remote mirror.”
 
@@ -189,6 +190,7 @@ Recommendation:
 
 - trigger immediately after local mutations, but coalesce aggressively if multiple changes happen close together
 - also run a pull before feed refresh if the user is signed in
+- when the user signs in and the local database is empty, bootstrap from the server before normal app usage proceeds
 
 This gives most of the value of shared state without background workers or perpetual polling.
 
@@ -256,12 +258,18 @@ Suggested implementation order:
 3. Add shared `SyncCoordinator`
 4. Sync configured sources first
 5. Sync seen-state second
-6. Add sign-in bootstrap hydration
-7. Integrate trigger-based sync into non-web app flows
-8. Add session and source-error sync if still needed after the first two domains are stable
+6. Add source-error sync third
+7. Add sign-in bootstrap hydration
+8. Integrate trigger-based sync into non-web app flows
+
+## Fixed Decisions
+
+- `GET /api/sync/bootstrap` is required in v1
+- `sync_failures` must be durable local state
+- source-error state is included in v1 sync scope
+- sign-in with an empty local database should bootstrap from server state before normal app usage begins
 
 ## Open Questions
 
-- Whether source-error state is worth syncing in v1 or should remain derivable from current feed refreshes
 - Whether pull should be pure incremental from the start or bootstrap with occasional full snapshots
-- Whether sign-in should always force a full local reconciliation before normal app usage begins
+- Whether non-empty local databases should always perform a full reconciliation at sign-in or only use incremental sync
