@@ -40,7 +40,7 @@ The local database remains the non-web runtime store. Local edits are written im
 3. reconciles the local database to the resolved server view
 4. clears or updates local pending mutation records
 
-Conflict resolution is last-write-wins using server-managed timestamps or versions.
+Conflict resolution is last-write-wins using server-managed versions and server acceptance order.
 
 This keeps the offline story practical without making the local database a separate long-term source of truth.
 
@@ -78,11 +78,13 @@ Each syncable server entity should carry server-managed change metadata:
 - a monotonically increasing version, or
 - an updated-at timestamp with sufficient precision and server ownership
 
-Recommended rule:
+V1 rule:
 
 - local mutation is sent with its client-known base version or last-known server version
-- server compares incoming mutation against current entity version
-- server resolves with last-write-wins and returns the resolved record and its latest server version
+- the server owns the canonical entity version
+- the server applies incoming mutations in arrival order
+- when a mutation is accepted, the server increments the entity version and returns the resolved record
+- for concurrent offline edits, last-write-wins means last successfully applied on the server, not a comparison of client clocks
 
 This should be applied consistently for:
 
@@ -90,6 +92,8 @@ This should be applied consistently for:
 - mark item seen or unseen
 - session replacement or invalidation
 - source error updates where retained
+
+This design intentionally avoids client-clock comparison in conflict handling.
 
 ## Client Architecture
 
@@ -140,6 +144,8 @@ Each mutation record should include:
 
 This keeps queued local intent explicit and easier to replay or deduplicate than whole-table snapshots.
 
+`mutation_id` is also the server-side idempotency key for replay-safe push handling.
+
 ## Server API Design
 
 Add dedicated sync endpoints rather than forcing clients to infer sync through existing CRUD APIs.
@@ -149,9 +155,11 @@ Recommended server API shape:
 - `POST /api/sync/push`
   - accepts a batch of local mutations
   - resolves conflicts server-side
-  - returns accepted mutations, rejected mutations, and resolved entity state
+  - treats `mutation_id` as a required idempotency key
+  - returns per-mutation status plus resolved entity state
 - `GET /api/sync/pull?since=<cursor>`
   - returns remote changes since the client’s last successful pull
+  - represents removals and reversals with tombstones
 - `GET /api/sync/bootstrap`
   - returns full current syncable state for first-time device hydration
 
@@ -160,6 +168,11 @@ The server should return:
 - latest entity state
 - current server version or timestamp
 - next sync cursor
+
+The mutation dequeue rule is:
+
+- a client removes a pending mutation only after receiving a successful response for that `mutation_id`
+- if the network fails after the server applied the mutation, replaying the same `mutation_id` must return the same resolved result rather than applying the mutation twice
 
 This avoids making the client reconstruct sync semantics from multiple unrelated endpoints.
 
@@ -175,6 +188,15 @@ Recommended tables:
 - optionally `sync_conflicts` if conflict diagnostics later need separate storage
 
 Existing app tables should continue to store the resolved application state, not a separate “remote mirror.”
+
+All sync tables and synced application state are account-scoped.
+
+That means:
+
+- pending mutations belong to the signed-in account
+- sync cursors and durable sync failures belong to the signed-in account
+- synced configured sources, seen-state, and synced source errors belong to the signed-in account
+- on account switch, the prior account’s synced application state is cleared before bootstrap of the new account
 
 ## Trigger Model
 
@@ -195,6 +217,9 @@ Recommendation:
   - the signed-in account differs from the account that populated the local database
   - local sync metadata is missing, invalid, or incompatible
 - on same-account sign-in with valid sync metadata, complete sign-in and run incremental sync immediately after
+- execute sync through one serialized `SyncCoordinator` per signed-in account
+- run push before pull in each sync pass
+- if a trigger fires during an active sync, queue exactly one follow-up sync pass after the current run completes
 
 This gives most of the value of shared state without background workers or perpetual polling.
 
@@ -227,6 +252,29 @@ For v1:
 - session expiry should halt push and pull until reauthentication
 
 If there is any ambiguity between local-only session artifacts and server account session state, the server session should win.
+
+## Seen-State Identity
+
+Seen-state uses the server’s public feed item ID as the canonical cross-client identity.
+
+Rules:
+
+- sync payloads use the same public item IDs returned by `/api/feed`
+- non-web clients store seen or unseen state by canonical item ID even if the full feed item is not currently cached locally
+- unknown pulled seen-state remains durable local state and should apply once the corresponding item appears in a later feed refresh
+
+This keeps seen-state sync independent from raw feed-cache replication.
+
+## Source-Error Authority
+
+Source errors included in sync are server-owned shared state, not device-local diagnostics.
+
+Rules:
+
+- only source errors produced by server refresh or server sync behavior are syncable
+- device-local transient networking or parsing failures on non-web clients do not become shared synced source-error records
+- pulled synced source errors replace local synced source-error state for the signed-in account
+- non-web clients may still surface local transient errors separately, but those are not part of bidirectional sync state
 
 ## Testing
 
@@ -276,6 +324,12 @@ Suggested implementation order:
   - account change
   - missing or invalid sync metadata
 - same-account sign-in with valid sync metadata should use immediate incremental sync instead of blocking on full reconciliation
+- incremental pull uses tombstones for removals and reversals
+- last-write-wins means last successfully applied on the server
+- `mutation_id` is a required idempotency key and mutations are dequeued only after acknowledged success
+- sync state and synced application data are account-scoped
+- seen-state uses the server public feed item ID as canonical identity
+- sync runs through one serialized coordinator per signed-in account
 
 ## Open Questions
 
