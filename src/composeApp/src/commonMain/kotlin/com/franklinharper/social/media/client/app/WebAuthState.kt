@@ -48,6 +48,15 @@ class WebAuthState(
         }
     }
 
+    suspend fun signOut() {
+        sessionRepository.signOut()
+        _uiState.value = WebAuthUiState(
+            status = WebAuthStatus.Unauthenticated,
+            lastSubmittedCredentials = _uiState.value.lastSubmittedCredentials,
+            activeAction = AuthAction.SignIn,
+        )
+    }
+
     private suspend fun submit(
         email: String,
         password: String,

@@ -110,6 +110,13 @@ fun App() {
                         }
                     }
                 },
+                onSignOut = {
+                    if (webAuthState != null) {
+                        scope.launch {
+                            webAuthState.signOut()
+                        }
+                    }
+                },
                 onAuthenticationFailure = {
                     if (webAuthState != null) {
                         scope.launch {
@@ -165,6 +172,7 @@ internal fun AppRoot(
     isWideLayout: Boolean = false,
     onSignIn: (String, String) -> Unit = { _, _ -> },
     onSignUp: (String, String) -> Unit = { _, _ -> },
+    onSignOut: () -> Unit = {},
     onAuthenticationFailure: () -> Unit = {},
     onSelectFeedSource: (com.franklinharper.social.media.client.domain.FeedSource?) -> Unit = {},
     onSelectAddSourceType: (SourceType) -> Unit = {},
@@ -212,6 +220,7 @@ internal fun AppRoot(
                 onOpenAddSource()
                 screen = AppScreen.AddSource
             },
+            onSignOut = onSignOut,
             onSelectSource = onSelectFeedSource,
             onRefresh = onRefreshFeed,
             onShowSeenItems = onShowSeenItems,
@@ -256,6 +265,7 @@ internal fun AppRoot(
                 onOpenAddSource()
                 screen = AppScreen.AddSource
             },
+            onSignOut = onSignOut,
             onSelectSource = onSelectFeedSource,
             onRefresh = onRefreshFeed,
             onShowSeenItems = onShowSeenItems,

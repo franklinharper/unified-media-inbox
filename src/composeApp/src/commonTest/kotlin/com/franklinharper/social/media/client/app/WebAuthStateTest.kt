@@ -103,6 +103,22 @@ class WebAuthStateTest {
         assertEquals(WebAuthStatus.SessionExpired, state.uiState.value.status)
         assertEquals(1, repository.clearCalls)
     }
+
+    @Test
+    fun `sign out returns user to unauthenticated state and calls repository sign out`() = runTest {
+        val repository = FakeWebAuthSessionRepository(
+            restoreState = SessionState.SignedIn(
+                AccountSession(accountId = "user-1", accessToken = "token-1"),
+            ),
+        )
+        val state = WebAuthState(sessionRepository = repository)
+
+        state.start()
+        state.signOut()
+
+        assertEquals(WebAuthStatus.Unauthenticated, state.uiState.value.status)
+        assertEquals(1, repository.signOutCalls)
+    }
 }
 
 private class FakeWebAuthSessionRepository(
@@ -112,6 +128,7 @@ private class FakeWebAuthSessionRepository(
     private val signInFailure: Throwable? = null,
 ) : WebAuthenticationSessionRepository {
     var clearCalls = 0
+    var signOutCalls = 0
 
     override suspend fun restoreSession(): SessionState = restoreState
 
@@ -122,6 +139,10 @@ private class FakeWebAuthSessionRepository(
 
     override suspend fun signUp(email: String, password: String): SessionState =
         signUpState
+
+    override suspend fun signOut() {
+        signOutCalls += 1
+    }
 
     override suspend fun clearSession() {
         clearCalls += 1

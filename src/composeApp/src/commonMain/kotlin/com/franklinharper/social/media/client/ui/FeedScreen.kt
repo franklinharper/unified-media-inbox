@@ -28,6 +28,7 @@ fun FeedScreen(
     state: FeedShellUiState,
     isWideLayout: Boolean = false,
     onAddSourcesClick: () -> Unit = {},
+    onSignOut: () -> Unit = {},
     onSelectSource: (FeedSource?) -> Unit = {},
     onRefresh: () -> Unit = {},
     onShowSeenItems: () -> Unit = {},
@@ -80,11 +81,21 @@ fun FeedScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text("Feed")
-                        Button(
-                            onClick = onRefresh,
-                            modifier = Modifier.testTag("feed-refresh-button"),
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            Text("Refresh")
+                            Button(
+                                onClick = onRefresh,
+                                modifier = Modifier.testTag("feed-refresh-button"),
+                            ) {
+                                Text("Refresh")
+                            }
+                            Button(
+                                onClick = onSignOut,
+                                modifier = Modifier.testTag("feed-sign-out-button"),
+                            ) {
+                                Text("Sign out")
+                            }
                         }
                     }
 

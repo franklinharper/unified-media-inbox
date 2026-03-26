@@ -191,6 +191,22 @@ class WebRemoteRepositoriesTest {
         assertEquals("/api/auth/sign-up", http.lastPostPath)
         assertEquals("""{"email":"new@example.com","password":"secret"}""", http.lastPostBody)
     }
+
+    @Test
+    fun `remote session repository signs out through auth endpoint and clears bearer token`() = runBlocking {
+        val http = FakeWebApiHttp(
+            postResponses = mapOf(
+                "/api/auth/sign-out" to WebApiResponse(statusCode = 204, body = ""),
+            ),
+            initialBearerToken = "token-signout",
+        )
+        val repository = WebRemoteSessionRepository(http)
+
+        repository.signOut()
+
+        assertEquals("/api/auth/sign-out", http.lastPostPath)
+        assertEquals(null, http.bearerToken)
+    }
 }
 
 private class FakeWebApiHttp(

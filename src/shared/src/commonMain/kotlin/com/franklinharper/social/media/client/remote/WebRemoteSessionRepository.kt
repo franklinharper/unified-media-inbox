@@ -10,6 +10,7 @@ interface WebAuthenticationSessionRepository {
     suspend fun restoreSession(): SessionState
     suspend fun signIn(email: String, password: String): SessionState
     suspend fun signUp(email: String, password: String): SessionState
+    suspend fun signOut()
     suspend fun clearSession()
 }
 
@@ -65,6 +66,10 @@ class WebRemoteSessionRepository(
         if (response.statusCode !in 200..299 && response.statusCode != 401) {
             response.requireNoContentSuccess()
         }
+    }
+
+    override suspend fun signOut() {
+        signOut(PlatformId.Bluesky)
     }
 
     override suspend fun clearAll() {

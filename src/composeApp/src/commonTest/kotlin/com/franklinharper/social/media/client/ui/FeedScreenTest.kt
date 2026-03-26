@@ -131,6 +131,21 @@ class FeedScreenTest {
     }
 
     @Test
+    fun `sign out button emits sign out action`() = runComposeUiTest {
+        var signOutCount = 0
+        setContent {
+            FeedScreen(
+                state = fakeState(),
+                onSignOut = { signOutCount += 1 },
+            )
+        }
+
+        onNodeWithTag("feed-sign-out-button").performClick()
+
+        kotlin.test.assertEquals(1, signOutCount)
+    }
+
+    @Test
     fun `show seen items button emits action at bottom of feed`() = runComposeUiTest {
         var showSeenCount = 0
         val source = FeedSource(PlatformId.Rss, "rss-1", "rss-1")
@@ -325,6 +340,26 @@ class FeedScreenTest {
 
         onNodeWithTag("login-email-field").assertExists()
         onNodeWithText("Your session expired. Sign in again.").assertExists()
+    }
+
+    @Test
+    fun `signing out from app root returns user to login screen`() = runComposeUiTest {
+        setContent {
+            var authState by remember { mutableStateOf(WebAuthUiState(status = WebAuthStatus.Authenticated)) }
+            AppRoot(
+                feedState = fakeState(),
+                addSourceState = AddSourceUiState(),
+                authState = authState,
+                onSignOut = {
+                    authState = WebAuthUiState(status = WebAuthStatus.Unauthenticated)
+                },
+            )
+        }
+
+        onNodeWithTag("feed-sign-out-button").performClick()
+
+        onNodeWithTag("login-email-field").assertExists()
+        onNodeWithText("Feed").assertDoesNotExist()
     }
 }
 

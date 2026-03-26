@@ -5,12 +5,14 @@ export const APP_VIEWPORT = { width: 1280, height: 720 };
 const AUTH = {
   email: { x: 640, y: 132 },
   password: { x: 640, y: 210 },
+  signInButton: { x: 320, y: 260 },
   signUpButton: { x: 960, y: 260 },
 };
 
 const FEED = {
   emptyAddSourcesButton: { x: 78, y: 191 },
-  refreshButton: { x: 1230, y: 38 },
+  refreshButton: { x: 1100, y: 38 },
+  signOutButton: { x: 1195, y: 38 },
 };
 
 const ADD_SOURCE = {
@@ -30,14 +32,26 @@ export async function signUpThroughCanvas(page: Page, email: string, password: s
     response.url().includes("/api/auth/sign-up") && response.request().method() === "POST",
   );
 
-  await page.mouse.click(AUTH.email.x, AUTH.email.y);
-  await page.keyboard.type(email);
-  await page.mouse.click(AUTH.password.x, AUTH.password.y);
-  await page.keyboard.type(password);
+  await replaceTextInField(page, AUTH.email, email);
+  await replaceTextInField(page, AUTH.password, password);
   await activateCanvasButton(page, AUTH.signUpButton);
 
   const signUpResponse = await signUpResponsePromise;
   expect(signUpResponse.status()).toBe(200);
+  await expect(page.getByText("Feed")).toBeVisible({ timeout: 15_000 });
+}
+
+export async function signInThroughCanvas(page: Page, email: string, password: string): Promise<void> {
+  const signInResponsePromise = page.waitForResponse((response) =>
+    response.url().includes("/api/auth/sign-in") && response.request().method() === "POST",
+  );
+
+  await replaceTextInField(page, AUTH.email, email);
+  await replaceTextInField(page, AUTH.password, password);
+  await activateCanvasButton(page, AUTH.signInButton);
+
+  const signInResponse = await signInResponsePromise;
+  expect(signInResponse.status()).toBe(200);
   await expect(page.getByText("Feed")).toBeVisible({ timeout: 15_000 });
 }
 
@@ -46,22 +60,40 @@ export async function addRssSourceThroughCanvas(page: Page, url: string): Promis
   await page.waitForTimeout(3_000);
   await page.mouse.click(ADD_SOURCE.rssTypeButton.x, ADD_SOURCE.rssTypeButton.y);
   await page.waitForTimeout(3_000);
-  await page.mouse.click(ADD_SOURCE.rssUrlField.x, ADD_SOURCE.rssUrlField.y);
-  await page.keyboard.type(url);
+  await replaceTextInField(page, ADD_SOURCE.rssUrlField, url);
   const initialRefresh = await waitForFeedRefresh(page, async () => {
     await activateCanvasButton(page, ADD_SOURCE.addSourceButton);
   });
   if (initialRefresh.items.length > 0) return initialRefresh;
 
+  return refreshFeedUntilItems(page, initialRefresh);
+}
+
+export async function signOutFromFeed(page: Page): Promise<void> {
+  await activateCanvasButton(page, FEED.signOutButton);
+  await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible({ timeout: 15_000 });
+}
+
+export async function refreshFeedUntilItems(
+  page: Page,
+  initialRefresh?: FeedRefreshPayload,
+): Promise<FeedRefreshPayload> {
+  if (initialRefresh != null && initialRefresh.items.length > 0) return initialRefresh;
+
+  var latest = initialRefresh;
   for (let attempt = 0; attempt < 4; attempt++) {
     await page.waitForTimeout(2_000);
-    const refreshed = await waitForFeedRefresh(page, async () => {
+    latest = await waitForFeedRefresh(page, async () => {
       await page.mouse.click(FEED.refreshButton.x, FEED.refreshButton.y);
     });
-    if (refreshed.items.length > 0) return refreshed;
+    if (latest.items.length > 0) return latest;
   }
 
-  return initialRefresh;
+  return latest ?? {
+    status: 200,
+    items: [],
+    sourceStatuses: [],
+  };
 }
 
 async function activateCanvasButton(
@@ -71,6 +103,17 @@ async function activateCanvasButton(
   await page.mouse.click(point.x, point.y);
   await page.waitForTimeout(300);
   await page.mouse.click(point.x, point.y);
+}
+
+async function replaceTextInField(
+  page: Page,
+  point: { x: number; y: number },
+  text: string,
+): Promise<void> {
+  await page.mouse.click(point.x, point.y);
+  await page.keyboard.press("Meta+A");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type(text);
 }
 
 export async function expectRecentFeedItems(payload: FeedRefreshPayload): Promise<void> {

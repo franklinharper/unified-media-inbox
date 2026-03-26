@@ -121,7 +121,12 @@ cd ../e2e
 npm test
 ```
 
-The first browser test is currently skipped. The Compose JS auth screen renders through a canvas and does not yet expose stable browser selectors for reliable Playwright automation.
+The current browser test drives the Compose JS canvas UI through Playwright and validates the live sign-up, sign-in, sign-out, add-source, and feed-refresh flow.
+
+Near-term browser auth e2e TODOs:
+- duplicate-email signup error
+- wrong-password sign-in error
+- session-expired bounce back to login
 
 For repeatable browser debugging without ad hoc `node -e` commands, use the checked-in debug scripts:
 
