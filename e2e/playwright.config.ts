@@ -12,6 +12,14 @@ export default defineConfig({
   },
   webServer: [
     {
+      command: "node scripts/fixture-server.js",
+      url: "http://127.0.0.1:9090/health",
+      reuseExistingServer: true,
+      stdout: "pipe",
+      stderr: "pipe",
+      timeout: 30_000,
+    },
+    {
       command: "cd ../src && ./gradlew :server:run --no-daemon",
       url: "http://127.0.0.1:8080/health",
       reuseExistingServer: true,

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Hacker News Front Page</title>
+    <link>https://news.ycombinator.com/</link>
+    <description>Deterministic Hacker News fixture feed</description>
+    <item>
+      <title>Launch HN: Deterministic Feed Fixtures</title>
+      <link>https://news.ycombinator.com/item?id=10000001</link>
+      <guid>https://news.ycombinator.com/item?id=10000001</guid>
+      <comments>https://news.ycombinator.com/item?id=10000001</comments>
+      <pubDate>Tue, 24 Mar 2026 17:00:00 GMT</pubDate>
+      <description>A fixture-backed launch post for deterministic browser tests.</description>
+    </item>
+    <item>
+      <title>Ask HN: How do you de-flake end-to-end tests?</title>
+      <link>https://news.ycombinator.com/item?id=10000002</link>
+      <guid>https://news.ycombinator.com/item?id=10000002</guid>
+      <comments>https://news.ycombinator.com/item?id=10000002</comments>
+      <pubDate>Tue, 24 Mar 2026 16:00:00 GMT</pubDate>
+      <description>Discussion about deterministic fixtures and browser automation.</description>
+    </item>
+  </channel>
+</rss>

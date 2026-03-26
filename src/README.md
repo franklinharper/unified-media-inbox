@@ -121,8 +121,10 @@ cd ../e2e
 npm test
 ```
 
-The current browser test drives the Compose JS app through Playwright and validates the live sign-up, sign-in, sign-out, add-source, and feed-refresh flow.
+The current browser test drives the Compose JS app through Playwright and validates the sign-up, sign-in, sign-out, add-source, and feed-refresh flow against a deterministic RSS fixture served over HTTP.
 For the most brittle browser interactions, the test runner now enables a web-only automation bridge with `?automationBridge=1`. The bridge exposes stable DOM controls for auth, RSS add-source, refresh, and sign-out, plus read-only feed metadata for assertions, while still invoking the same app callbacks and backend requests as the real UI.
+
+Playwright also starts a tiny fixture server on `http://127.0.0.1:9090` so the app server fetches a real RSS URL during the test without depending on live third-party feed content.
 
 Near-term browser auth e2e TODOs:
 - duplicate-email signup error

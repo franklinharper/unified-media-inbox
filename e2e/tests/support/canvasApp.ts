@@ -38,7 +38,7 @@ export async function signUpThroughCanvas(page: Page, email: string, password: s
 
   const signUpResponse = await signUpResponsePromise;
   expect(signUpResponse.status()).toBe(200);
-  await expect(page.getByText("Feed")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId(FEED.refreshTestId)).toBeAttached({ timeout: 15_000 });
 }
 
 export async function signInThroughCanvas(page: Page, email: string, password: string): Promise<void> {
@@ -52,7 +52,7 @@ export async function signInThroughCanvas(page: Page, email: string, password: s
 
   const signInResponse = await signInResponsePromise;
   expect(signInResponse.status()).toBe(200);
-  await expect(page.getByText("Feed")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId(FEED.refreshTestId)).toBeAttached({ timeout: 15_000 });
 }
 
 export async function addRssSourceThroughCanvas(page: Page, url: string): Promise<void> {
@@ -114,6 +114,23 @@ export async function expectRecentFeedItems(page: Page): Promise<void> {
 
   const itemTitles = await page.getByTestId(FEED.itemTitlesTestId).textContent();
   expect((itemTitles ?? "").trim().length).toBeGreaterThan(0);
+}
+
+export async function expectFixtureFeedItems(
+  page: Page,
+  expectedSourceName: string,
+  expectedTitles: string[],
+): Promise<void> {
+  expect(await readFeedItemCount(page)).toBe(expectedTitles.length);
+
+  const sourceNames = await page.getByTestId(FEED.sourceNamesTestId).textContent();
+  expect((sourceNames ?? "").trim()).toBe(expectedSourceName);
+
+  const itemTitles = ((await page.getByTestId(FEED.itemTitlesTestId).textContent()) ?? "")
+    .split("\n")
+    .map((title) => title.trim())
+    .filter((title) => title.length > 0);
+  expect(itemTitles).toEqual(expectedTitles);
 }
 
 async function waitForFeedRefresh(
