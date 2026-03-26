@@ -10,6 +10,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalUriHandler
@@ -26,6 +28,7 @@ import com.franklinharper.social.media.client.app.WebAuthState
 import com.franklinharper.social.media.client.app.WebAuthStatus
 import com.franklinharper.social.media.client.app.createAppContainer
 import com.franklinharper.social.media.client.app.isWide
+import com.franklinharper.social.media.client.app.WebAutomationState
 import com.franklinharper.social.media.client.domain.ClientError
 import com.franklinharper.social.media.client.domain.FeedItem
 import com.franklinharper.social.media.client.remote.WebAuthenticationSessionRepository
@@ -38,6 +41,13 @@ import kotlinx.coroutines.launch
 @Composable
 @Preview
 fun App() {
+    App(automationState = null)
+}
+
+@Composable
+fun App(
+    automationState: WebAutomationState? = null,
+) {
     MaterialTheme {
         BoxWithConstraints {
             val uriHandler = LocalUriHandler.current
@@ -95,6 +105,7 @@ fun App() {
                 feedState = uiState,
                 addSourceState = addSourceUiState,
                 authState = authUiState,
+                automationState = automationState,
                 isWideLayout = layout.isWide,
                 onSignIn = { email, password ->
                     if (webAuthState != null) {
@@ -169,6 +180,7 @@ internal fun AppRoot(
     feedState: FeedShellUiState,
     addSourceState: AddSourceUiState,
     authState: WebAuthUiState = WebAuthUiState(status = WebAuthStatus.Authenticated),
+    automationState: WebAutomationState? = null,
     isWideLayout: Boolean = false,
     onSignIn: (String, String) -> Unit = { _, _ -> },
     onSignUp: (String, String) -> Unit = { _, _ -> },
@@ -186,6 +198,35 @@ internal fun AppRoot(
 ) {
     var screen by rememberSaveable { mutableStateOf(AppScreen.Feed) }
     var selectedItem by remember { mutableStateOf<FeedItem?>(null) }
+
+    SideEffect {
+        automationState?.bindActions(
+            onSignIn = onSignIn,
+            onSignUp = onSignUp,
+            onRefreshFeed = onRefreshFeed,
+            onSignOut = onSignOut,
+            onOpenAddSourceScreen = {
+                onOpenAddSource()
+                screen = AppScreen.AddSource
+            },
+            onSelectRssSourceType = {
+                onSelectAddSourceType(SourceType.Rss)
+            },
+            onAddRssSource = onAddRssSource,
+        )
+        automationState?.updateEnvironment(
+            authVisible = authState.status != WebAuthStatus.Authenticated,
+            feedVisible = authState.status == WebAuthStatus.Authenticated,
+            isSubmitting = authState.toLoginUiState().isSubmitting,
+            isAddingSource = addSourceState.isAdding,
+        )
+    }
+
+    DisposableEffect(automationState) {
+        onDispose {
+            automationState?.clearActions()
+        }
+    }
 
     LaunchedEffect(authState.status, feedState.loadError) {
         if (

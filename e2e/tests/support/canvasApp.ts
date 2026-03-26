@@ -1,30 +1,27 @@
 import { expect, type Page } from "@playwright/test";
 
 export const APP_VIEWPORT = { width: 1280, height: 720 };
+const AUTOMATION_PATH = "/?automationBridge=1";
 
 const AUTH = {
-  email: { x: 640, y: 132 },
-  password: { x: 640, y: 210 },
-  signInButton: { x: 320, y: 260 },
-  signUpButton: { x: 960, y: 260 },
+  emailTestId: "e2e-auth-email",
+  passwordTestId: "e2e-auth-password",
+  signInTestId: "e2e-auth-sign-in",
+  signUpTestId: "e2e-auth-sign-up",
 };
 
 const FEED = {
-  emptyAddSourcesButton: { x: 78, y: 191 },
-  refreshButton: { x: 1100, y: 38 },
-  signOutButton: { x: 1195, y: 38 },
-};
-
-const ADD_SOURCE = {
-  rssTypeButton: { x: 68, y: 138 },
-  rssUrlField: { x: 640, y: 150 },
-  addSourceButton: { x: 90, y: 217 },
+  refreshTestId: "e2e-feed-refresh",
+  signOutTestId: "e2e-feed-sign-out",
+  rssUrlTestId: "e2e-add-source-rss-url",
+  rssSubmitTestId: "e2e-add-source-submit-rss",
 };
 
 export async function loadApp(page: Page): Promise<void> {
   await page.setViewportSize(APP_VIEWPORT);
-  await page.goto("/", { waitUntil: "domcontentloaded" });
-  await page.waitForTimeout(5_000);
+  await page.goto(AUTOMATION_PATH, { waitUntil: "domcontentloaded" });
+  await page.getByTestId("e2e-automation-bridge").waitFor({ state: "attached", timeout: 15_000 });
+  await page.waitForTimeout(1_000);
 }
 
 export async function signUpThroughCanvas(page: Page, email: string, password: string): Promise<void> {
@@ -32,9 +29,9 @@ export async function signUpThroughCanvas(page: Page, email: string, password: s
     response.url().includes("/api/auth/sign-up") && response.request().method() === "POST",
   );
 
-  await replaceTextInField(page, AUTH.email, email);
-  await replaceTextInField(page, AUTH.password, password);
-  await activateCanvasButton(page, AUTH.signUpButton);
+  await setBridgeField(page, AUTH.emailTestId, email);
+  await setBridgeField(page, AUTH.passwordTestId, password);
+  await pressBridgeButton(page, AUTH.signUpTestId);
 
   const signUpResponse = await signUpResponsePromise;
   expect(signUpResponse.status()).toBe(200);
@@ -46,9 +43,9 @@ export async function signInThroughCanvas(page: Page, email: string, password: s
     response.url().includes("/api/auth/sign-in") && response.request().method() === "POST",
   );
 
-  await replaceTextInField(page, AUTH.email, email);
-  await replaceTextInField(page, AUTH.password, password);
-  await activateCanvasButton(page, AUTH.signInButton);
+  await setBridgeField(page, AUTH.emailTestId, email);
+  await setBridgeField(page, AUTH.passwordTestId, password);
+  await pressBridgeButton(page, AUTH.signInTestId);
 
   const signInResponse = await signInResponsePromise;
   expect(signInResponse.status()).toBe(200);
@@ -56,13 +53,18 @@ export async function signInThroughCanvas(page: Page, email: string, password: s
 }
 
 export async function addRssSourceThroughCanvas(page: Page, url: string): Promise<FeedRefreshPayload> {
-  await page.mouse.click(FEED.emptyAddSourcesButton.x, FEED.emptyAddSourcesButton.y);
-  await page.waitForTimeout(3_000);
-  await page.mouse.click(ADD_SOURCE.rssTypeButton.x, ADD_SOURCE.rssTypeButton.y);
-  await page.waitForTimeout(3_000);
-  await replaceTextInField(page, ADD_SOURCE.rssUrlField, url);
+  const addSourceResponsePromise = page.waitForResponse((response) =>
+    response.url().includes("/api/sources") && response.request().method() === "POST",
+  );
+
+  await setBridgeField(page, FEED.rssUrlTestId, url);
+  await pressBridgeButton(page, FEED.rssSubmitTestId);
+
+  const addSourceResponse = await addSourceResponsePromise;
+  expect(addSourceResponse.status()).toBe(201);
+
   const initialRefresh = await waitForFeedRefresh(page, async () => {
-    await activateCanvasButton(page, ADD_SOURCE.addSourceButton);
+    await pressBridgeButton(page, FEED.refreshTestId);
   });
   if (initialRefresh.items.length > 0) return initialRefresh;
 
@@ -70,7 +72,7 @@ export async function addRssSourceThroughCanvas(page: Page, url: string): Promis
 }
 
 export async function signOutFromFeed(page: Page): Promise<void> {
-  await activateCanvasButton(page, FEED.signOutButton);
+  await pressBridgeButton(page, FEED.signOutTestId);
   await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible({ timeout: 15_000 });
 }
 
@@ -84,7 +86,7 @@ export async function refreshFeedUntilItems(
   for (let attempt = 0; attempt < 4; attempt++) {
     await page.waitForTimeout(2_000);
     latest = await waitForFeedRefresh(page, async () => {
-      await page.mouse.click(FEED.refreshButton.x, FEED.refreshButton.y);
+      await pressBridgeButton(page, FEED.refreshTestId);
     });
     if (latest.items.length > 0) return latest;
   }
@@ -96,25 +98,23 @@ export async function refreshFeedUntilItems(
   };
 }
 
-async function activateCanvasButton(
-  page: Page,
-  point: { x: number; y: number },
-): Promise<void> {
-  await page.mouse.click(point.x, point.y);
-  await page.waitForTimeout(300);
-  await page.mouse.click(point.x, point.y);
+async function setBridgeField(page: Page, testId: string, value: string): Promise<void> {
+  await page.getByTestId(testId).evaluate((element, nextValue) => {
+    const input = element as HTMLInputElement;
+    input.value = nextValue as string;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }, value);
 }
 
-async function replaceTextInField(
-  page: Page,
-  point: { x: number; y: number },
-  text: string,
-): Promise<void> {
-  await page.mouse.click(point.x, point.y);
-  await page.keyboard.press("Meta+A");
-  await page.keyboard.press("Backspace");
-  await page.keyboard.type(text);
+async function pressBridgeButton(page: Page, testId: string): Promise<void> {
+  const button = page.getByTestId(testId);
+  await expect(button).not.toBeDisabled({ timeout: 5_000 });
+  await button.evaluate((element) => {
+    (element as HTMLButtonElement).click();
+  });
 }
+
 
 export async function expectRecentFeedItems(payload: FeedRefreshPayload): Promise<void> {
   expect(payload.status).toBe(200);
