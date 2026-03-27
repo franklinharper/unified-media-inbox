@@ -4,19 +4,14 @@ import com.franklinharper.social.media.client.domain.AccountSession
 import com.franklinharper.social.media.client.domain.PlatformId
 import com.franklinharper.social.media.client.domain.SessionState
 import com.franklinharper.social.media.client.repository.SessionRepository
+import com.franklinharper.social.media.client.sync.AuthenticatedSessionRepository
 import kotlinx.serialization.encodeToString
 
-interface WebAuthenticationSessionRepository {
-    suspend fun restoreSession(): SessionState
-    suspend fun signIn(email: String, password: String): SessionState
-    suspend fun signUp(email: String, password: String): SessionState
-    suspend fun signOut()
-    suspend fun clearSession()
-}
+typealias WebAuthenticationSessionRepository = AuthenticatedSessionRepository
 
 class WebRemoteSessionRepository(
     private val http: WebApiHttp,
-) : SessionRepository, WebAuthenticationSessionRepository {
+) : SessionRepository, AuthenticatedSessionRepository {
     override suspend fun signIn(email: String, password: String): SessionState {
         return authenticate("/api/auth/sign-in", email, password)
     }

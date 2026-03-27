@@ -39,6 +39,14 @@ CREATE TABLE account_sessions (
   expires_at_epoch_millis INTEGER
 );
 
+CREATE TABLE server_sync_sessions (
+  session_key TEXT NOT NULL PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  access_token TEXT NOT NULL,
+  refresh_token TEXT,
+  expires_at_epoch_millis INTEGER
+);
+
 CREATE TABLE feed_sources (
   user_id TEXT NOT NULL DEFAULT '',
   platform_id TEXT NOT NULL,
@@ -145,6 +153,28 @@ WHERE platform_id = ?;
 
 removeAllAccountSessions:
 DELETE FROM account_sessions;
+
+selectServerSyncSession:
+SELECT account_id, access_token, refresh_token, expires_at_epoch_millis
+FROM server_sync_sessions
+WHERE session_key = ?;
+
+upsertServerSyncSession:
+INSERT OR REPLACE INTO server_sync_sessions(
+  session_key,
+  account_id,
+  access_token,
+  refresh_token,
+  expires_at_epoch_millis
+)
+VALUES (?, ?, ?, ?, ?);
+
+removeServerSyncSession:
+DELETE FROM server_sync_sessions
+WHERE session_key = ?;
+
+removeAllServerSyncSessions:
+DELETE FROM server_sync_sessions;
 
 upsertFeedSource:
 INSERT OR REPLACE INTO feed_sources(user_id, platform_id, source_id, display_name)

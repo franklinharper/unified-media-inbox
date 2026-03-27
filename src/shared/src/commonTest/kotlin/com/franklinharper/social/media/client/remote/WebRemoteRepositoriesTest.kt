@@ -5,6 +5,7 @@ import com.franklinharper.social.media.client.domain.ConfiguredSource
 import com.franklinharper.social.media.client.domain.FeedRequest
 import com.franklinharper.social.media.client.domain.PlatformId
 import com.franklinharper.social.media.client.domain.SessionState
+import com.franklinharper.social.media.client.sync.AuthenticatedSessionRepository
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -206,6 +207,11 @@ class WebRemoteRepositoriesTest {
 
         assertEquals("/api/auth/sign-out", http.lastPostPath)
         assertEquals(null, http.bearerToken)
+    }
+
+    @Test
+    fun `remote session repository implements the shared authenticated session contract`() {
+        assertIs<AuthenticatedSessionRepository>(WebRemoteSessionRepository(FakeWebApiHttp()))
     }
 }
 
