@@ -28,6 +28,12 @@ The Android flow should match the current web HNRSS E2E coverage:
 
 Use an Android instrumentation test in `src/androidApp/src/androidTest` as the primary driver for UI actions. The instrumentation test will use Compose test APIs and stable logical selectors such as existing `testTag` values and visible text instead of pixel coordinates.
 
+This first slice also includes the Android test-infrastructure setup needed to make that possible:
+
+- instrumentation runner configuration in `src/androidApp/build.gradle.kts`
+- Android test dependencies for Compose/UI instrumentation
+- any minimal manifest or packaging configuration required for `connectedAndroidTest`-style execution
+
 Pair that instrumentation test with a small host-side runner script that prepares and reports the run:
 
 - uninstall the Android app first to guarantee a fresh install
@@ -68,7 +74,7 @@ Each issue entry should include enough context to make the result actionable:
 
 Issue-class definitions for this slice:
 
-- `warning`: non-fatal issues observed during the run that did not fail the E2E flow, such as unexpected warning-level log entries from the app process during an otherwise passing step
+- `warning`: non-fatal issues explicitly recorded by the test harness itself, such as a step recovering after a retry or a known degraded-but-non-failing state. Generic warning-level logcat noise is out of scope for this slice.
 - `handled_error`: visible app-level error text shown in the UI while the app continues running
 - `assertion_failure`: a failed instrumentation expectation, reported with the active screen and test step instead of only the raw JUnit failure text
 - `crash`: uncaught exception or Android runtime process failure observed during the test window
