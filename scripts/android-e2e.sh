@@ -101,11 +101,20 @@ device_visible() {
   "$ADB_BIN" devices | awk -v target="$serial" 'NR > 1 && $1 == target && $2 == "device" { found = 1 } END { exit(found ? 0 : 1) }'
 }
 
+device_services_ready() {
+  local serial="$1"
+  local boot_anim
+  boot_anim="$("$ADB_BIN" -s "$serial" shell getprop init.svc.bootanim 2>/dev/null | tr -d '\r')"
+  [[ "$boot_anim" == "stopped" ]] || return 1
+  "$ADB_BIN" -s "$serial" shell cmd package list packages >/dev/null 2>&1 || return 1
+}
+
 wait_for_device() {
   local serial="$1"
   local attempt=1
   while [[ "$attempt" -le 120 ]]; do
-    if device_visible "$serial" && device_ready "$serial"; then
+    if device_visible "$serial" && device_ready "$serial" && device_services_ready "$serial"; then
+      sleep 5
       return 0
     fi
     sleep 2
