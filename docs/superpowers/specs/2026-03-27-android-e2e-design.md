@@ -36,14 +36,32 @@ This first slice also includes the Android test-infrastructure setup needed to m
 
 Pair that instrumentation test with a small host-side runner script that prepares and reports the run:
 
+- provision a dedicated emulator for the run
 - uninstall the Android app first to guarantee a fresh install
 - ensure the backend fixture dependencies are running
 - clear logcat before the test window
 - install the app and Android test APK
 - run the instrumentation test on the selected emulator
 - collect instrumentation output and fresh logcat into a structured report
+- shut down the emulator during cleanup
 
 This keeps UI interaction in the Android test layer, where Compose selectors are stable, while leaving fresh-install orchestration and crash/log capture to the host side where they are easier to control.
+
+## Emulator Lifecycle
+
+The host-side runner owns emulator lifecycle for the first slice so the Android E2E command is CI-friendly and self-contained.
+
+Runner responsibilities:
+
+- look for a named AVD definition
+- create that AVD automatically if it is missing
+- boot a dedicated emulator instance for the run
+- wait for full boot completion before installing the app or starting tests
+- tear the emulator down when the run finishes, including failure paths
+
+The first slice should use a pinned device profile and pinned Android system image so local and CI runs use the same emulator definition.
+
+If emulator creation or boot fails, the runner should still emit the final report with a setup failure entry that is clearly separated from app-level failures.
 
 ## Test Seams
 
@@ -129,6 +147,8 @@ For reproducibility, the runner owns backend orchestration for the first slice. 
 
 The Android E2E command should therefore be self-contained rather than depending on manually pre-started services.
 
+The same self-contained contract applies to emulator availability. The runner should not require a pre-booted developer emulator.
+
 The Android app talks to the Ktor server through the emulator host alias, but the server is the component that fetches RSS source URLs after the source is submitted. The RSS fixture URL used in the add-source form should therefore stay server-reachable in the same way as the web E2E flow rather than being rewritten to an emulator-only address.
 
 Expected first-slice fixture URL:
@@ -139,6 +159,8 @@ Expected first-slice fixture URL:
 
 Verification for this slice should include:
 
+- automatic AVD creation when missing
+- emulator boot, test execution, and teardown through the runner
 - the Android instrumentation E2E test running on an emulator from a fresh install
 - the host-side runner producing both report files
 - at least one successful end-to-end run proving the full auth/add-source/sign-out/sign-in/refresh flow
@@ -148,3 +170,4 @@ Verification for this slice should include:
 - Compose semantics and Android instrumentation may require a few extra tags in the add-source path.
 - Local server availability and emulator host addressing must be handled carefully for deterministic RSS fetches.
 - Logcat noise can hide useful failures unless the runner filters the report to the test window and app process.
+- Android SDK, `avdmanager`, and emulator system-image availability must be validated clearly so CI setup failures produce actionable reports.
