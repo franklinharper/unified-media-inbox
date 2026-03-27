@@ -46,6 +46,34 @@ class AddSourceScreenTest {
     }
 
     @Test
+    fun `rss form exposes stable selectors for android instrumentation`() = runComposeUiTest {
+        setContent {
+            AddRssSourceForm(
+                isAdding = false,
+                addError = null,
+                onAddSource = {},
+            )
+        }
+
+        onNodeWithTag("add-source-rss-url-field").assertExists()
+        onNodeWithTag("add-source-rss-submit-button").assertExists()
+    }
+
+    @Test
+    fun `rss form tags the handled add error`() = runComposeUiTest {
+        setContent {
+            AddRssSourceForm(
+                isAdding = false,
+                addError = "Unable to add source",
+                onAddSource = {},
+            )
+        }
+
+        onNodeWithTag("add-source-error").assertExists()
+        onNodeWithText("Unable to add source").assertExists()
+    }
+
+    @Test
     fun `successful add returns to feed`() = runComposeUiTest {
         setContent {
             var addSourceState by remember { mutableStateOf(AddSourceUiState()) }
@@ -69,7 +97,7 @@ class AddSourceScreenTest {
 
         onNodeWithText("Add sources").performClick()
         onNodeWithText("RSS feed").performClick()
-        onNodeWithText("Feed URL").performTextInput("https://hnrss.org/newest")
+        onNodeWithTag("add-source-rss-url-field").performTextInput("https://hnrss.org/newest")
         onNodeWithText("Add source").performClick()
 
         onNodeWithText("Feed").assertExists()
@@ -100,7 +128,7 @@ class AddSourceScreenTest {
 
         onNodeWithText("Add sources").performClick()
         onNodeWithText("RSS feed").performClick()
-        onNodeWithText("Feed URL").performTextInput("https://hnrss.org/newest")
+        onNodeWithTag("add-source-rss-url-field").performTextInput("https://hnrss.org/newest")
         onNodeWithText("Add source").performClick()
         onNodeWithText("Add sources").performClick()
 

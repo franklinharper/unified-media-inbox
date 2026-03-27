@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -31,16 +32,22 @@ fun AddRssSourceForm(
         OutlinedTextField(
             value = url,
             onValueChange = { url = it },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("add-source-rss-url-field"),
             label = { Text("Feed URL") },
             enabled = !isAdding,
         )
         addError?.let { message ->
-            SelectableErrorText(message)
+            SelectableErrorText(
+                message = message,
+                modifier = Modifier.testTag("add-source-error"),
+            )
         }
         Button(
             onClick = { onAddSource(url) },
             enabled = !isAdding && url.isNotBlank(),
+            modifier = Modifier.testTag("add-source-rss-submit-button"),
         ) {
             Text(if (isAdding) "Adding..." else "Add source")
         }
