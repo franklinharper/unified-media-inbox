@@ -5,6 +5,7 @@ import com.franklinharper.social.media.client.client.bluesky.BlueskyClient
 import com.franklinharper.social.media.client.client.rss.RssClient
 import com.franklinharper.social.media.client.client.twitter.TwitterClient
 import com.franklinharper.social.media.client.db.SocialMediaDatabase
+import com.franklinharper.social.media.client.getPlatform
 import com.franklinharper.social.media.client.domain.PlatformId
 import com.franklinharper.social.media.client.domain.SessionState
 import com.franklinharper.social.media.client.repository.DefaultFeedRepository
@@ -19,15 +20,20 @@ import com.franklinharper.social.media.client.remote.WebRemoteConfiguredSourceRe
 import com.franklinharper.social.media.client.remote.WebRemoteFeedCacheRepository
 import com.franklinharper.social.media.client.remote.WebRemoteFeedRepository
 import com.franklinharper.social.media.client.remote.WebRemoteSeenItemRepository
-import com.franklinharper.social.media.client.remote.WebRemoteSessionRepository
 import com.franklinharper.social.media.client.remote.WebRemoteSourceErrorRepository
+import com.franklinharper.social.media.client.sync.ServerSyncAuthenticatedSessionRepository
+import com.franklinharper.social.media.client.sync.SqlDelightServerSyncSessionStore
 
 fun buildAppContainer(
     database: SocialMediaDatabase,
     clock: () -> Long,
 ): AppContainer {
     val configuredSourceRepository = SqlDelightConfiguredSourceRepository(database, LOCAL_OWNER_USER_ID)
-    val sessionRepository = SqlDelightSessionRepository(database)
+    val sessionRepository = ServerSyncAuthenticatedSessionRepository(
+        platformSessionRepository = SqlDelightSessionRepository(database),
+        http = DefaultWebApiHttp(baseUrl = defaultApiBaseUrl()),
+        serverSyncSessionStore = SqlDelightServerSyncSessionStore(database),
+    )
     val seenItemRepository = SqlDelightSeenItemRepository(database, LOCAL_OWNER_USER_ID, clock = clock)
     val feedCacheRepository = SqlDelightFeedCacheRepository(database, LOCAL_OWNER_USER_ID, clock = clock)
     val sourceErrorRepository = SqlDelightSourceErrorRepository(database, LOCAL_OWNER_USER_ID)
@@ -78,7 +84,7 @@ fun createRemoteAppContainer(
 ): AppContainer {
     val http = DefaultWebApiHttp(baseUrl = baseUrl)
     val configuredSourceRepository = WebRemoteConfiguredSourceRepository(http)
-    val sessionRepository = WebRemoteSessionRepository(http)
+    val sessionRepository = com.franklinharper.social.media.client.remote.WebRemoteSessionRepository(http)
     val seenItemRepository = WebRemoteSeenItemRepository(http)
     val feedCacheRepository = WebRemoteFeedCacheRepository(http)
     val sourceErrorRepository = WebRemoteSourceErrorRepository(http)
@@ -95,4 +101,11 @@ fun createRemoteAppContainer(
             feedRepository = feedRepository,
         )
     }
+}
+
+private fun defaultApiBaseUrl(): String = when {
+    getPlatform().name.startsWith("Android") -> "http://10.0.2.2:8080"
+    getPlatform().name.startsWith("Java ") -> "http://127.0.0.1:8080"
+    getPlatform().name.startsWith("iOS") -> "http://127.0.0.1:8080"
+    else -> ""
 }

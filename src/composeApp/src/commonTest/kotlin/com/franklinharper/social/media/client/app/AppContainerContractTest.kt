@@ -22,6 +22,7 @@ import com.franklinharper.social.media.client.getPlatform
 import com.franklinharper.social.media.client.remote.WebRemoteConfiguredSourceRepository
 import com.franklinharper.social.media.client.remote.WebRemoteFeedRepository
 import com.franklinharper.social.media.client.remote.WebRemoteSessionRepository
+import com.franklinharper.social.media.client.sync.AuthenticatedSessionRepository
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertSame
@@ -60,6 +61,7 @@ class AppContainerContractTest {
 
         if (isJvmPlatform()) {
             assertTrue(container !== PlaceholderAppContainer)
+            assertIs<AuthenticatedSessionRepository>(container.sessionRepository)
         } else {
             assertSame(PlaceholderAppContainer, container)
         }
@@ -71,6 +73,7 @@ class AppContainerContractTest {
 
         assertIs<WebRemoteConfiguredSourceRepository>(container.configuredSourceRepository)
         assertIs<WebRemoteSessionRepository>(container.sessionRepository)
+        assertIs<AuthenticatedSessionRepository>(container.sessionRepository)
         assertIs<WebRemoteFeedRepository>(container.feedRepository)
     }
 }

@@ -3,7 +3,7 @@ package com.franklinharper.social.media.client.app
 import com.franklinharper.social.media.client.domain.ClientError
 import com.franklinharper.social.media.client.domain.ClientFailure
 import com.franklinharper.social.media.client.domain.SessionState
-import com.franklinharper.social.media.client.remote.WebAuthenticationSessionRepository
+import com.franklinharper.social.media.client.sync.AuthenticatedSessionRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 class WebAuthState(
-    private val sessionRepository: WebAuthenticationSessionRepository,
+    private val sessionRepository: AuthenticatedSessionRepository,
 ) {
     private val _uiState = MutableStateFlow(WebAuthUiState())
 

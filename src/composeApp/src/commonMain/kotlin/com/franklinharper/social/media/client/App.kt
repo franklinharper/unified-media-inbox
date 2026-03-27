@@ -31,11 +31,11 @@ import com.franklinharper.social.media.client.app.isWide
 import com.franklinharper.social.media.client.app.WebAutomationState
 import com.franklinharper.social.media.client.domain.ClientError
 import com.franklinharper.social.media.client.domain.FeedItem
-import com.franklinharper.social.media.client.remote.WebAuthenticationSessionRepository
 import com.franklinharper.social.media.client.ui.AddSourceScreen
 import com.franklinharper.social.media.client.ui.FeedItemDetailScreen
 import com.franklinharper.social.media.client.ui.FeedScreen
 import com.franklinharper.social.media.client.ui.LoginScreen
+import com.franklinharper.social.media.client.sync.AuthenticatedSessionRepository
 import kotlinx.coroutines.launch
 
 @Composable
@@ -53,13 +53,13 @@ fun App(
             val uriHandler = LocalUriHandler.current
             val layout = remember(maxWidth) { ResponsiveLayout.forMaxWidth(maxWidth) }
             val container = remember { createAppContainer() }
-            val webAuthRepository = remember(container) {
+            val authRepository = remember(container) {
                 container
                     .takeUnless { it === PlaceholderAppContainer }
-                    ?.sessionRepository as? WebAuthenticationSessionRepository
+                    ?.sessionRepository as? AuthenticatedSessionRepository
             }
-            val webAuthState = remember(webAuthRepository) {
-                webAuthRepository?.let(::WebAuthState)
+            val authState = remember(authRepository) {
+                authRepository?.let(::WebAuthState)
             }
             val feedShellState = remember(container) {
                 if (container === PlaceholderAppContainer) {
@@ -84,7 +84,7 @@ fun App(
             }
             val placeholderAddSourceState by rememberUpdatedState(AddSourceUiState())
             val addSourceUiState by addSourceState?.uiState?.collectAsState() ?: rememberUpdatedState(placeholderAddSourceState)
-            val authUiState by webAuthState?.uiState?.collectAsState()
+            val authUiState by authState?.uiState?.collectAsState()
                 ?: rememberUpdatedState(
                     com.franklinharper.social.media.client.app.WebAuthUiState(
                         status = WebAuthStatus.Authenticated,
@@ -92,8 +92,8 @@ fun App(
                 )
             val scope = rememberCoroutineScope()
 
-            LaunchedEffect(webAuthState) {
-                webAuthState?.start()
+            LaunchedEffect(authState) {
+                authState?.start()
             }
             LaunchedEffect(feedShellState, authUiState.status) {
                 if (authUiState.status == WebAuthStatus.Authenticated) {
@@ -108,30 +108,30 @@ fun App(
                 automationState = automationState,
                 isWideLayout = layout.isWide,
                 onSignIn = { email, password ->
-                    if (webAuthState != null) {
+                    if (authState != null) {
                         scope.launch {
-                            webAuthState.signIn(email, password)
+                            authState.signIn(email, password)
                         }
                     }
                 },
                 onSignUp = { email, password ->
-                    if (webAuthState != null) {
+                    if (authState != null) {
                         scope.launch {
-                            webAuthState.signUp(email, password)
+                            authState.signUp(email, password)
                         }
                     }
                 },
                 onSignOut = {
-                    if (webAuthState != null) {
+                    if (authState != null) {
                         scope.launch {
-                            webAuthState.signOut()
+                            authState.signOut()
                         }
                     }
                 },
                 onAuthenticationFailure = {
-                    if (webAuthState != null) {
+                    if (authState != null) {
                         scope.launch {
-                            webAuthState.onUnauthorized()
+                            authState.onUnauthorized()
                         }
                     }
                 },

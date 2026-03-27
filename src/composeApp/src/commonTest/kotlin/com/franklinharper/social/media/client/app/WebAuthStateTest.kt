@@ -4,7 +4,7 @@ import com.franklinharper.social.media.client.domain.AccountSession
 import com.franklinharper.social.media.client.domain.ClientError
 import com.franklinharper.social.media.client.domain.ClientFailure
 import com.franklinharper.social.media.client.domain.SessionState
-import com.franklinharper.social.media.client.remote.WebAuthenticationSessionRepository
+import com.franklinharper.social.media.client.sync.AuthenticatedSessionRepository
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -126,7 +126,7 @@ private class FakeWebAuthSessionRepository(
     private val signInState: SessionState = restoreState,
     private val signUpState: SessionState = restoreState,
     private val signInFailure: Throwable? = null,
-) : WebAuthenticationSessionRepository {
+) : AuthenticatedSessionRepository {
     var clearCalls = 0
     var signOutCalls = 0
 

@@ -15,6 +15,9 @@ import com.franklinharper.social.media.client.repository.SqlDelightFeedCacheRepo
 import com.franklinharper.social.media.client.repository.SqlDelightSeenItemRepository
 import com.franklinharper.social.media.client.repository.SqlDelightSessionRepository
 import com.franklinharper.social.media.client.repository.SqlDelightSourceErrorRepository
+import com.franklinharper.social.media.client.remote.DefaultWebApiHttp
+import com.franklinharper.social.media.client.sync.ServerSyncAuthenticatedSessionRepository
+import com.franklinharper.social.media.client.sync.SqlDelightServerSyncSessionStore
 import java.io.File
 
 internal actual fun createAppContainer(): AppContainer = createJvmAppContainer()
@@ -25,7 +28,11 @@ internal fun createJvmAppContainer(
     val database = JvmDatabaseFactory.fileBacked(databaseFile)
     val configuredSourceRepository = SqlDelightConfiguredSourceRepository(database, LOCAL_OWNER_USER_ID)
     val seenItemRepository = SqlDelightSeenItemRepository(database, LOCAL_OWNER_USER_ID) { System.currentTimeMillis() }
-    val sessionRepository = SqlDelightSessionRepository(database)
+    val sessionRepository = ServerSyncAuthenticatedSessionRepository(
+        platformSessionRepository = SqlDelightSessionRepository(database),
+        http = DefaultWebApiHttp(baseUrl = desktopApiBaseUrl()),
+        serverSyncSessionStore = SqlDelightServerSyncSessionStore(database),
+    )
     val feedCacheRepository = SqlDelightFeedCacheRepository(database, LOCAL_OWNER_USER_ID) { System.currentTimeMillis() }
     val sourceErrorRepository = SqlDelightSourceErrorRepository(database, LOCAL_OWNER_USER_ID)
     val clientRegistry = ClientRegistry(
@@ -103,3 +110,5 @@ private fun twitterSessionFromEnvironment(): AccountSession? {
         accessToken = token,
     )
 }
+
+private fun desktopApiBaseUrl(): String = "http://127.0.0.1:8080"
