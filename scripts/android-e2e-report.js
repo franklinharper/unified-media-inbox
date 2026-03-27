@@ -35,13 +35,13 @@ function escapeForReport(text) {
 }
 
 function loadAppReport(runDirPath) {
-  const filePath = path.join(runDirPath, 'android-e2e-report.json');
+  const filePath = resolveCollectedArtifactPath(runDirPath, 'android-e2e-report.json');
   const parsed = readJson(filePath);
   return parsed && typeof parsed === 'object' ? parsed : null;
 }
 
 function loadProgress(runDirPath) {
-  const filePath = path.join(runDirPath, 'android-e2e-progress.json');
+  const filePath = resolveCollectedArtifactPath(runDirPath, 'android-e2e-progress.json');
   const parsed = readJson(filePath);
   return parsed && typeof parsed === 'object' ? parsed : null;
 }
@@ -49,6 +49,47 @@ function loadProgress(runDirPath) {
 function findLatestOutputDir(runDirPath) {
   const candidate = path.join(runDirPath, 'androidTest-results');
   return fs.existsSync(candidate) ? candidate : null;
+}
+
+function findCollectedAdditionalOutputDir(runDirPath) {
+  const candidate = path.join(runDirPath, 'connected_android_test_additional_output');
+  return fs.existsSync(candidate) ? candidate : null;
+}
+
+function resolveCollectedArtifactPath(runDirPath, fileName) {
+  const topLevelPath = path.join(runDirPath, fileName);
+  if (fs.existsSync(topLevelPath)) {
+    return topLevelPath;
+  }
+
+  const additionalOutputDir = findCollectedAdditionalOutputDir(runDirPath);
+  if (!additionalOutputDir) {
+    return topLevelPath;
+  }
+
+  const candidates = [];
+  const stack = [additionalOutputDir];
+  while (stack.length > 0) {
+    const currentDir = stack.pop();
+    const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+    for (const entry of entries) {
+      const entryPath = path.join(currentDir, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(entryPath);
+        continue;
+      }
+      if (entry.isFile() && entry.name === fileName) {
+        candidates.push(entryPath);
+      }
+    }
+  }
+
+  if (candidates.length > 0) {
+    candidates.sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs);
+    return candidates[0];
+  }
+
+  return topLevelPath;
 }
 
 function readInstrumentationFailure(runDirPath) {
@@ -228,9 +269,10 @@ const instrumentationFailure = readInstrumentationFailure(runDir);
 const crashException = readCrashException(runDir);
 const logcatPath = path.join(runDir, 'logcat.txt');
 const gradleLogPath = path.join(runDir, 'gradle.log');
-const appReportPath = path.join(runDir, 'android-e2e-report.json');
-const progressPath = path.join(runDir, 'android-e2e-progress.json');
+const appReportPath = resolveCollectedArtifactPath(runDir, 'android-e2e-report.json');
+const progressPath = resolveCollectedArtifactPath(runDir, 'android-e2e-progress.json');
 const testOutputsDir = findLatestOutputDir(runDir);
+const additionalOutputDir = findCollectedAdditionalOutputDir(runDir);
 const logcatText = readText(logcatPath);
 const gradleLogText = readText(gradleLogPath);
 const crashBlock = extractCrashBlock(logcatText);
@@ -323,10 +365,12 @@ const report = {
     logcat: fs.existsSync(logcatPath) ? logcatPath : null,
     gradleLog: fs.existsSync(gradleLogPath) ? gradleLogPath : null,
     androidTestResults: testOutputsDir,
+    connectedAndroidTestAdditionalOutput: additionalOutputDir,
   },
   instrumentation: {
     testRan,
     testOutputsDir,
+    additionalOutputDir,
   },
 };
 

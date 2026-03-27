@@ -1,6 +1,7 @@
 package com.franklinharper.social.media.client
 
 import android.content.Context
+import androidx.test.platform.app.InstrumentationRegistry
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -41,7 +42,7 @@ data class AndroidE2eStepResult(
 }
 
 class AndroidE2eReport(
-    private val outputFile: File,
+    private val outputFiles: List<File>,
 ) {
     private val steps = mutableListOf<AndroidE2eStepResult>()
     private val issues = mutableListOf<AndroidE2eIssue>()
@@ -103,18 +104,33 @@ class AndroidE2eReport(
     }
 
     private fun writeSnapshot() {
-        outputFile.parentFile?.mkdirs()
-        outputFile.writeText(
-            JSONObject()
-                .put("steps", JSONArray(steps.map(AndroidE2eStepResult::toJson)))
-                .put("issues", JSONArray(issues.map(AndroidE2eIssue::toJson)))
-                .toString(),
-        )
+        val snapshot = JSONObject()
+            .put("steps", JSONArray(steps.map(AndroidE2eStepResult::toJson)))
+            .put("issues", JSONArray(issues.map(AndroidE2eIssue::toJson)))
+            .toString()
+
+        outputFiles.forEach { outputFile ->
+            outputFile.parentFile?.mkdirs()
+            outputFile.writeText(snapshot)
+        }
     }
 
     companion object {
         private const val FILE_NAME = "android-e2e-report.json"
 
         fun file(context: Context): File = File(context.filesDir, FILE_NAME)
+
+        fun files(context: Context): List<File> =
+            listOfNotNull(
+                file(context),
+                additionalOutputFile(FILE_NAME),
+            )
+
+        private fun additionalOutputFile(fileName: String): File? {
+            val outputDir = InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")
+                ?.takeIf { it.isNotBlank() }
+                ?: return null
+            return File(outputDir, fileName)
+        }
     }
 }

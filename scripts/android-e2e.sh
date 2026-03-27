@@ -225,12 +225,21 @@ collect_android_test_outputs() {
   fi
 }
 
+collect_additional_test_outputs() {
+  local additional_outputs_root="$SRC_DIR/androidApp/build/outputs/connected_android_test_additional_output"
+  if [[ -d "$additional_outputs_root" ]]; then
+    rm -rf "$RUN_DIR/connected_android_test_additional_output"
+    cp -R "$additional_outputs_root" "$RUN_DIR/connected_android_test_additional_output"
+  fi
+}
+
 collect_app_artifacts() {
   if [[ -n "$ANDROID_SERIAL" ]]; then
     pull_run_as_file "$ANDROID_SERIAL" "files/android-e2e-progress.json" "$RUN_DIR/android-e2e-progress.json" || true
     pull_run_as_file "$ANDROID_SERIAL" "files/android-e2e-report.json" "$RUN_DIR/android-e2e-report.json" || true
     "$ADB_BIN" -s "$ANDROID_SERIAL" logcat -d -v threadtime >"$RUN_DIR/logcat.txt" 2>/dev/null || true
   fi
+  collect_additional_test_outputs
   collect_android_test_outputs
 }
 
@@ -318,6 +327,7 @@ STARTED_EMULATOR=1
 wait_for_device "$ANDROID_SERIAL"
 
 STAGE="fresh_install"
+rm -rf "$SRC_DIR/androidApp/build/outputs/connected_android_test_additional_output"
 "$ADB_BIN" -s "$ANDROID_SERIAL" uninstall "$APP_ID" >/dev/null 2>&1 || true
 
 STAGE="run_tests"

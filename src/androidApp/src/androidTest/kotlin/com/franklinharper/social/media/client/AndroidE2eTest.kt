@@ -13,6 +13,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import java.io.File
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -27,8 +28,8 @@ class AndroidE2eTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val targetContext = instrumentation.targetContext
         targetContext.deleteDatabase("social-media-client.db")
-        AndroidE2eProgress.file(targetContext).delete()
-        AndroidE2eReport.file(targetContext).delete()
+        AndroidE2eProgress.files(targetContext).forEach(File::delete)
+        AndroidE2eReport.files(targetContext).forEach(File::delete)
 
         val launchIntent = requireNotNull(
             targetContext.packageManager.getLaunchIntentForPackage("com.franklinharper.social.media.client"),
@@ -37,7 +38,7 @@ class AndroidE2eTest {
         }
         instrumentation.startActivitySync(launchIntent)
 
-        val report = AndroidE2eReport(AndroidE2eReport.file(targetContext))
+        val report = AndroidE2eReport(AndroidE2eReport.files(targetContext))
         val email = "android-e2e-${System.currentTimeMillis()}@example.com"
         val password = "secret123"
 
