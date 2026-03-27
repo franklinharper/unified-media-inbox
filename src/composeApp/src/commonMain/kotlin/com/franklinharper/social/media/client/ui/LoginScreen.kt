@@ -76,7 +76,10 @@ fun LoginScreen(
             }
         }
         state.message?.let { message ->
-            SelectableErrorText(message)
+            SelectableErrorText(
+                message = message,
+                modifier = Modifier.testTag("login-error"),
+            )
         }
         OutlinedTextField(
             value = email,

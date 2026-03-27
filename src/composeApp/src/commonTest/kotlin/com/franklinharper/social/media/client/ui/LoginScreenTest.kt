@@ -65,6 +65,7 @@ class LoginScreenTest {
         }
 
         onNodeWithText("Your session expired. Sign in again.").assertExists()
+        onNodeWithTag("login-error").assertExists()
     }
 
     @Test
