@@ -73,7 +73,17 @@ Issue-class definitions for this slice:
 - `assertion_failure`: a failed instrumentation expectation, reported with the active screen and test step instead of only the raw JUnit failure text
 - `crash`: uncaught exception or Android runtime process failure observed during the test window
 
-The instrumentation test should explicitly note handled UI errors it encounters during login, add-source, and feed verification steps. The host-side runner should identify uncaught crashes and Android runtime failures from logcat captured during the run.
+The instrumentation test should explicitly note handled UI errors it encounters at every major user-flow step:
+
+- sign up
+- add source
+- initial feed verification
+- sign out
+- sign back in
+- refresh
+- final feed verification
+
+The host-side runner should identify uncaught crashes and Android runtime failures from logcat captured during the run.
 
 The instrumentation layer should wrap each major step in a small reporting helper so assertion failures are recorded with:
 
@@ -101,6 +111,15 @@ Both reports should live under a stable output directory so repeated runs are ea
 ## Fixture And Backend Dependencies
 
 The Android test should use the same deterministic RSS fixture concept as the web E2E suite. The host-side runner should reuse the existing local Ktor server and fixture server pattern rather than inventing a second backend stack.
+
+For reproducibility, the runner owns backend orchestration for the first slice. It should:
+
+- start the fixture server itself
+- start the Ktor server itself
+- wait for both health checks before installing and launching the Android test
+- tear them down when the run completes
+
+The Android E2E command should therefore be self-contained rather than depending on manually pre-started services.
 
 The Android app talks to the Ktor server through the emulator host alias, but the server is the component that fetches RSS source URLs after the source is submitted. The RSS fixture URL used in the add-source form should therefore stay server-reachable in the same way as the web E2E flow rather than being rewritten to an emulator-only address.
 
