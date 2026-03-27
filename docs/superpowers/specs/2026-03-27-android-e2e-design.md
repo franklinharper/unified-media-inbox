@@ -99,6 +99,8 @@ The instrumentation layer should wrap each major step in a small reporting helpe
 - actual observed state, when available
 - original assertion exception text
 
+To preserve crash context, that same helper should also write the current screen and step to a small host-readable progress artifact before executing each major action. If the app process crashes, the host-side runner should attach the most recent recorded screen/step to the crash entry instead of guessing from logcat alone.
+
 ## Report Format
 
 Produce both:
