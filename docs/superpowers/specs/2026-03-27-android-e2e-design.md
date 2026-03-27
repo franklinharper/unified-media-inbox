@@ -66,7 +66,22 @@ Each issue entry should include enough context to make the result actionable:
 - exception or crash text, if any
 - relevant log excerpt, if available
 
+Issue-class definitions for this slice:
+
+- `warning`: non-fatal issues observed during the run that did not fail the E2E flow, such as unexpected warning-level log entries from the app process during an otherwise passing step
+- `handled_error`: visible app-level error text shown in the UI while the app continues running
+- `assertion_failure`: a failed instrumentation expectation, reported with the active screen and test step instead of only the raw JUnit failure text
+- `crash`: uncaught exception or Android runtime process failure observed during the test window
+
 The instrumentation test should explicitly note handled UI errors it encounters during login, add-source, and feed verification steps. The host-side runner should identify uncaught crashes and Android runtime failures from logcat captured during the run.
+
+The instrumentation layer should wrap each major step in a small reporting helper so assertion failures are recorded with:
+
+- current screen
+- current step name
+- expected condition
+- actual observed state, when available
+- original assertion exception text
 
 ## Report Format
 
@@ -87,7 +102,11 @@ Both reports should live under a stable output directory so repeated runs are ea
 
 The Android test should use the same deterministic RSS fixture concept as the web E2E suite. The host-side runner should reuse the existing local Ktor server and fixture server pattern rather than inventing a second backend stack.
 
-For Android, the RSS fixture URL must be reachable from the emulator. The simplest expected mapping is the emulator host alias form of the existing local fixture server URL.
+The Android app talks to the Ktor server through the emulator host alias, but the server is the component that fetches RSS source URLs after the source is submitted. The RSS fixture URL used in the add-source form should therefore stay server-reachable in the same way as the web E2E flow rather than being rewritten to an emulator-only address.
+
+Expected first-slice fixture URL:
+
+- `http://127.0.0.1:9090/feeds/hn-frontpage.xml`
 
 ## Verification
 
