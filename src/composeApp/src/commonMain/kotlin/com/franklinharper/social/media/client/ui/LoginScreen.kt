@@ -73,10 +73,10 @@ fun LoginScreen(
             ) {
                 Text("Welcome")
                 Text("Sign in or create an account to access your web feed.")
-                if (state.message != null) {
-                    Text(state.message)
-                }
             }
+        }
+        state.message?.let { message ->
+            SelectableErrorText(message)
         }
         OutlinedTextField(
             value = email,

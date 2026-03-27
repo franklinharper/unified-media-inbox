@@ -35,8 +35,8 @@ fun AddRssSourceForm(
             label = { Text("Feed URL") },
             enabled = !isAdding,
         )
-        if (addError != null) {
-            Text(addError)
+        addError?.let { message ->
+            SelectableErrorText(message)
         }
         Button(
             onClick = { onAddSource(url) },

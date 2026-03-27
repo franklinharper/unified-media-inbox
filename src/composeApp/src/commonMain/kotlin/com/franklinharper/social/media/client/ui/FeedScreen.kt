@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.franklinharper.social.media.client.app.FeedShellUiState
 import com.franklinharper.social.media.client.app.VisibleFeedEmptyState
+import com.franklinharper.social.media.client.domain.ClientError
 import com.franklinharper.social.media.client.domain.FeedItem
 import com.franklinharper.social.media.client.domain.FeedSource
 import kotlin.time.Clock
@@ -107,7 +108,15 @@ fun FeedScreen(
                         )
                     }
 
-                    when (val emptyState = state.emptyState) {
+                    when {
+                        state.loadError != null -> {
+                            SelectableErrorText(
+                                message = state.loadError.toDisplayMessage(),
+                                modifier = Modifier.testTag("feed-load-error"),
+                            )
+                        }
+
+                        else -> when (val emptyState = state.emptyState) {
                         VisibleFeedEmptyState.NoConfiguredSources -> {
                             EmptyFeedState(
                                 title = "No sources yet",
@@ -144,8 +153,18 @@ fun FeedScreen(
                             }
                         }
                     }
+                    }
                 }
             }
         }
     }
+}
+
+private fun ClientError.toDisplayMessage(): String = when (this) {
+    is ClientError.AuthenticationError -> message ?: "Authentication failed."
+    is ClientError.NetworkError -> message ?: "Network error."
+    is ClientError.ParsingError -> message ?: "Unable to parse response."
+    is ClientError.PermanentFailure -> message ?: "Request failed."
+    is ClientError.TemporaryFailure -> message ?: "Temporary failure."
+    is ClientError.RateLimitError -> retryAfterMillis?.let { "Try again in ${it}ms." } ?: "Rate limited."
 }

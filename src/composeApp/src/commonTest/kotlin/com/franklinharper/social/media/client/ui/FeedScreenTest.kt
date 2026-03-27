@@ -82,6 +82,19 @@ class FeedScreenTest {
     }
 
     @Test
+    fun `feed screen shows load error message`() = runComposeUiTest {
+        setContent {
+            FeedScreen(
+                state = FeedShellUiState(
+                    loadError = ClientError.NetworkError("Server sync failed"),
+                ),
+            )
+        }
+
+        onNodeWithText("Server sync failed").assertExists()
+    }
+
+    @Test
     fun `narrow layout uses dropdown source selector`() = runComposeUiTest {
         setContent { FeedScreen(state = fakeState()) }
 

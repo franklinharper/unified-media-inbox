@@ -35,8 +35,8 @@ fun AddBlueskySourceForm(
             label = { Text("Handle") },
             enabled = !isAdding,
         )
-        if (addError != null) {
-            Text(addError)
+        addError?.let { message ->
+            SelectableErrorText(message)
         }
         Button(
             onClick = { onAddSource(handle) },
