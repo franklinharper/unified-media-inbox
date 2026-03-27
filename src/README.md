@@ -33,6 +33,13 @@ in your IDE’s toolbar or build it directly from the terminal:
   .\gradlew.bat :composeApp:assembleDebug
   ```
 
+For a true fresh install during development, use the checked-in script from the repository root. It uninstalls the app first so Android clears the package sandbox before reinstalling and launching:
+
+- on macOS/Linux
+  ```shell
+  ./scripts/android-fresh-install.sh
+  ```
+
 ### Build and Run Desktop (JVM) Application
 
 To build and run the development version of the desktop app, use the run configuration from the run widget
