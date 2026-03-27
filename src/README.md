@@ -40,6 +40,28 @@ For a true fresh install during development, use the checked-in script from the 
   ./scripts/android-fresh-install.sh
   ```
 
+### Run Android E2E
+
+Use the repository-root runner to boot a dedicated emulator, start the local fixture and server dependencies, uninstall the app for a fresh state, run the Android instrumentation E2E, and assemble a report:
+
+- on macOS/Linux
+  ```shell
+  ./scripts/android-e2e.sh
+  ```
+
+The runner writes artifacts under `artifacts/android-e2e/<timestamp>/`, including:
+- `report.json`
+- `report.txt`
+- `logcat.txt`
+- copied connected-test outputs under `androidTest-results/`
+
+The runner expects a working Android SDK with:
+- `platform-tools`
+- `emulator`
+- `cmdline-tools/latest`
+
+If the dedicated `AndroidE2E_API35_Pixel5` AVD is missing, the runner creates it automatically from the installed Android 35 ARM system image.
+
 ### Build and Run Desktop (JVM) Application
 
 To build and run the development version of the desktop app, use the run configuration from the run widget
